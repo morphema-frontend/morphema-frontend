@@ -1,4 +1,4 @@
-﻿# Deploy Vercel (morphema.app)
+# Deploy Vercel (morphema.app)
 
 ## Prerequisiti
 - Repo frontend collegato a Vercel.
@@ -17,4 +17,5 @@
 7. Deploy.
 8. Vai in Project Settings -> Domains e aggiungi `morphema.app` (e `www.morphema.app` se richiesto).
 9. Applica i record DNS forniti da Vercel e imposta `morphema.app` come Primary.
+10. Esegui un Redeploy se necessario dopo l'attivazione del dominio.
 10. Esegui un Redeploy se necessario dopo l'attivazione del dominio.

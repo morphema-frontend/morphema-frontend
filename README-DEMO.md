@@ -1,4 +1,4 @@
-﻿# Morphema Demo
+# Morphema Demo
 
 ## Cosa e'
 - Demo frontend di Incarico autonomo (art. 2222 c.c.) tra Committente e Professionista occasionale.
@@ -23,4 +23,5 @@
 6. Clicca `Professionista occasionale (worker@test.com)`.
 7. Apri l'incarico pubblicato e clicca `Invia candidatura`.
 8. Logout.
+9. Rientra come `Committente` e clicca `Accetta candidatura`.
 9. Rientra come `Committente` e clicca `Accetta candidatura`.
