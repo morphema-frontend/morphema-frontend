@@ -12,23 +12,23 @@ export function RequireAuth({
   roles?: Role[]
   children: React.ReactNode
 }) {
-  const { me, loading } = useAuth()
+  const { user, loading } = useAuth()
   const router = useRouter()
 
   useEffect(() => {
     if (loading) return
-    if (!me) {
+    if (!user) {
       router.replace('/login')
       return
     }
-    if (roles && roles.length && !roles.includes(me.role as Role)) {
+    if (roles && roles.length && !roles.includes(user.role as Role)) {
       router.replace('/')
     }
-  }, [loading, me, roles, router])
+  }, [loading, user, roles, router])
 
   if (loading) return <div className="card">Loading…</div>
-  if (!me) return null
-  if (roles && roles.length && !roles.includes(me.role as Role)) return null
+  if (!user) return null
+  if (roles && roles.length && !roles.includes(user.role as Role)) return null
 
   return <>{children}</>
 }
