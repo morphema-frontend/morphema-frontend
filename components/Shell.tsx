@@ -19,7 +19,7 @@ function NavLink({ href, children }: { href: string; children: React.ReactNode }
 }
 
 export function Shell({ children }: { children: React.ReactNode }) {
-  const { me, signOut } = useAuth()
+  const { user, signOut } = useAuth()
   const router = useRouter()
 
   return (
@@ -30,22 +30,22 @@ export function Shell({ children }: { children: React.ReactNode }) {
             <Link href="/" className="no-underline">
               <div className="text-lg font-semibold">Morphema</div>
             </Link>
-            {me && <span className="badge">{me.role}</span>}
+            {user && <span className="badge">{user.role}</span>}
           </div>
           <div className="flex items-center gap-2">
-            {me?.role === 'horeca' && (
+            {user?.role === 'horeca' && (
               <>
                 <NavLink href="/venue">Dashboard</NavLink>
                 <NavLink href="/venue/gigs/new">New Gig</NavLink>
               </>
             )}
-            {me?.role === 'worker' && (
+            {user?.role === 'worker' && (
               <>
                 <NavLink href="/worker/skills">Skills</NavLink>
                 <NavLink href="/worker/gigs">Gigs</NavLink>
               </>
             )}
-            {me ? (
+            {user ? (
               <button
                 className="btn-secondary"
                 onClick={() => {
