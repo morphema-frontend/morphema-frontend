@@ -19,6 +19,12 @@ type VenueMe = { id: number; [k: string]: any }
 type ContractTemplate = { id: number; name: string; [k: string]: any }
 type InsuranceProduct = { id: number; name: string; [k: string]: any }
 
+const fallbackJobTypes: JobType[] = [
+  { id: 1, name: 'Prestazione generica', code: 'GENERIC', riskLevel: 'LOW' },
+  { id: 2, name: 'Supporto evento', code: 'EVENT_STAFF', riskLevel: 'MEDIUM' },
+  { id: 3, name: 'Accoglienza clienti', code: 'HOSPITALITY', riskLevel: 'LOW' },
+]
+
 function pad(n: number) {
   return String(n).padStart(2, '0')
 }
@@ -63,7 +69,13 @@ function isEventOnlyJobType(item: JobType) {
 
 async function readError(res: Response) {
   const text = await res.text()
-  return text || `${res.status} ${res.statusText}`
+  if (!text) return `${res.status} ${res.statusText}`
+  try {
+    const parsed = JSON.parse(text)
+    return parsed?.message || parsed?.error || text
+  } catch {
+    return text
+  }
 }
 
 export default function NewGigPage() {
@@ -78,6 +90,7 @@ export default function NewGigPage() {
   const [contractTemplateId, setContractTemplateId] = useState<number | null>(null)
   const [insuranceProducts, setInsuranceProducts] = useState<InsuranceProduct[]>([])
   const [insuranceProductId, setInsuranceProductId] = useState<number | null>(null)
+  const [catalogErr, setCatalogErr] = useState<string | null>(null)
 
   const [title, setTitle] = useState('Incarico autonomo')
   const [eventDate, setEventDate] = useState('')
@@ -117,10 +130,17 @@ export default function NewGigPage() {
         if (!v?.id) throw new Error('Committente non collegato a una venue.')
         setVenueId(Number(v.id))
 
-        // job types
-        const jtRes = await fetchAuth('/job-types/catalog')
-        if (!jtRes.ok) throw new Error(await readError(jtRes))
-        const jtList = normalizeCatalog(await jtRes.json())
+        // job types (fallback to static list)
+        setCatalogErr(null)
+        let jtList: JobType[] = []
+        try {
+          const jtRes = await fetchAuth('/job-types/catalog')
+          if (!jtRes.ok) throw new Error(await readError(jtRes))
+          jtList = normalizeCatalog(await jtRes.json())
+        } catch (e: any) {
+          setCatalogErr('Catalogo categorie non disponibile. Caricati valori base.')
+          jtList = fallbackJobTypes
+        }
         setJobTypes(jtList)
         const firstCore = jtList.find((jt) => !isEventOnlyJobType(jt))
         const firstAny = firstCore || jtList[0]
@@ -154,6 +174,24 @@ export default function NewGigPage() {
     })()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canUse])
+
+  async function reloadCatalog() {
+    if (!canUse) return
+    setCatalogErr(null)
+    try {
+      const jtRes = await fetchAuth('/job-types/catalog')
+      if (!jtRes.ok) throw new Error(await readError(jtRes))
+      const jtList = normalizeCatalog(await jtRes.json())
+      setJobTypes(jtList)
+      const firstCore = jtList.find((jt) => !isEventOnlyJobType(jt))
+      const firstAny = firstCore || jtList[0]
+      if (firstAny?.id) setJobTypeId((prev) => prev ?? Number(firstAny.id))
+    } catch (e: any) {
+      setCatalogErr('Catalogo categorie non disponibile. Caricati valori base.')
+      setJobTypes(fallbackJobTypes)
+      if (fallbackJobTypes[0]?.id) setJobTypeId((prev) => prev ?? Number(fallbackJobTypes[0].id))
+    }
+  }
 
   async function createGig() {
     if (!venueId) return setErr('Venue mancante')
@@ -283,6 +321,14 @@ export default function NewGigPage() {
                 </optgroup>
               ) : null}
             </select>
+            {catalogErr ? (
+              <div className="mt-2 flex items-center gap-2 text-xs text-amber-200">
+                <span>{catalogErr}</span>
+                <button className="btn-secondary" onClick={reloadCatalog} type="button">
+                  Riprova
+                </button>
+              </div>
+            ) : null}
             {selectedEventOnly ? (
               <div className="mt-2 rounded border border-amber-300/40 bg-amber-400/10 p-2 text-xs text-amber-100">
                 Solo evento/picco: incarico legato a evento, non turnazione continuativa.

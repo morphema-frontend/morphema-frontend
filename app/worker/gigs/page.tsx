@@ -62,7 +62,13 @@ function normalizeCatalog(json: any): JobType[] {
 
 async function readError(res: Response) {
   const text = await res.text()
-  return text || `${res.status} ${res.statusText}`
+  if (!text) return `${res.status} ${res.statusText}`
+  try {
+    const parsed = JSON.parse(text)
+    return parsed?.message || parsed?.error || text
+  } catch {
+    return text
+  }
 }
 
 function isAlreadyApplied(message: string) {
