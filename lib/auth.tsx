@@ -31,7 +31,7 @@ type AuthContextValue = {
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
-const TOKEN_KEY = 'accessToken'
+const TOKEN_KEY = 'morphema_accessToken'
 
 function apiBaseFromEnv() {
   return process.env.NEXT_PUBLIC_API_BASE_URL || 'http://127.0.0.1:3000/api'
@@ -140,6 +140,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = useCallback(() => {
     localStorage.removeItem(TOKEN_KEY)
+    localStorage.removeItem('accessToken')
     setUser(null)
   }, [])
 
