@@ -2,8 +2,10 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import GatedScreen from '@/components/GatedScreen'
 import TopBar from '@/components/TopBar'
 import { useAuth } from '@/lib/auth'
+import { readReasonCode } from '@/lib/gating'
 
 type Gig = {
   id: number
@@ -90,12 +92,13 @@ export default function WorkerGigsPage() {
   const [pollStartedAt, setPollStartedAt] = useState<number | null>(null)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
+  const [gateReason, setGateReason] = useState<string | null>(null)
 
   const canUse = useMemo(() => !!user && user.role === 'worker', [user])
 
   useEffect(() => {
     if (loading) return
-    if (!user) return router.replace('/login')
+    if (!user) return router.replace('/worker/auth/login')
     if (user.role !== 'worker') return router.replace('/venue/gigs')
   }, [loading, user, router])
 
@@ -104,8 +107,15 @@ export default function WorkerGigsPage() {
     const bRes = await fetchAuth('/bookings')
     if (bRes.status === 401) {
       signOut()
-      router.replace('/login')
+      router.replace('/worker/auth/login')
       return
+    }
+    if (bRes.status === 403) {
+      const reason = await readReasonCode(bRes)
+      if (reason) {
+        setGateReason(reason)
+        return
+      }
     }
     if (!bRes.ok) throw new Error(await readError(bRes))
     const bList = normalizeList<Booking>(await bRes.json())
@@ -130,8 +140,15 @@ export default function WorkerGigsPage() {
       const res = await fetchAuth('/gigs')
       if (res.status === 401) {
         signOut()
-        router.replace('/login')
+        router.replace('/worker/auth/login')
         return
+      }
+      if (res.status === 403) {
+        const reason = await readReasonCode(res)
+        if (reason) {
+          setGateReason(reason)
+          return
+        }
       }
       if (!res.ok) throw new Error(await readError(res))
       const json = await res.json()
@@ -220,7 +237,7 @@ export default function WorkerGigsPage() {
       })
       if (res.status === 401) {
         signOut()
-        router.replace('/login')
+        router.replace('/worker/auth/login')
         return
       }
       if (res.ok) {
@@ -229,6 +246,13 @@ export default function WorkerGigsPage() {
         setPollStartedAt(Date.now())
         await loadGigs()
         return
+      }
+      if (res.status === 403) {
+        const reason = await readReasonCode(res)
+        if (reason) {
+          setGateReason(reason)
+          return
+        }
       }
       const body = await readError(res)
       if (res.status === 409 || (res.status === 400 && isAlreadyApplied(body))) {
@@ -247,6 +271,7 @@ export default function WorkerGigsPage() {
 
   if (loading) return <div className="mx-auto mt-20 max-w-md card">Loading...</div>
   if (!user) return <div className="mx-auto mt-20 max-w-md card">Redirecting...</div>
+  if (gateReason) return <GatedScreen reasonCode={gateReason} ctaHref="/worker/onboarding/identity" />
 
   const applicationRows = bookings
     .slice()
@@ -258,12 +283,12 @@ export default function WorkerGigsPage() {
       <TopBar />
 
       {acceptedGig ? (
-        <div className="card card-accent mb-4 border-amber-400/30 bg-amber-400/10">
-          <div className="text-lg font-semibold text-amber-200">Sei stato selezionato {'\u2705'}</div>
-          <div className="mt-2 text-sm text-amber-100">
+        <div className="card card-accent mb-4 border-mid bg-blush">
+          <div className="text-lg font-semibold text-main">Sei stato selezionato {'\u2705'}</div>
+          <div className="mt-2 text-sm text-soft">
             {acceptedGig.title || 'Prestazione autonoma'} - {acceptedGig.venue?.name || acceptedGig.venueName || acceptedGig.venueId || 'Venue'}
           </div>
-          <div className="mt-2 text-sm text-amber-100">
+          <div className="mt-2 text-sm text-soft">
             Turno: {dateOnly(acceptedGig.startTime)} - {String(acceptedGig.payAmount ?? '-')} {acceptedGig.currency || 'EUR'}
           </div>
           <div className="mt-2 flex flex-wrap gap-2">
@@ -278,7 +303,7 @@ export default function WorkerGigsPage() {
               </span>
             ) : null}
           </div>
-          <div className="mt-3 rounded border border-amber-200/40 bg-amber-400/10 p-2 text-xs text-amber-100">
+          <div className="mt-3 rounded border border-light bg-surface p-2 text-xs text-soft">
             Prestazione autonoma (art. 2222 c.c.). Responsabilita' fiscale al lavoratore.
           </div>
         </div>
@@ -288,8 +313,8 @@ export default function WorkerGigsPage() {
         <div className="flex items-start justify-between gap-4">
           <div>
             <div className="badge">Professionista occasionale</div>
-            <h1 className="mt-2 text-lg font-semibold">Incarico autonomo (demo)</h1>
-            <p className="mt-1 text-sm text-zinc-300">
+            <h1 className="mt-2 text-lg font-semibold text-main">Incarico autonomo (demo)</h1>
+            <p className="mt-1 text-sm text-soft">
               Prestazione autonoma (art. 2222 c.c.) tra Committente e Professionista. Solo Candidatura.
             </p>
           </div>
@@ -305,24 +330,24 @@ export default function WorkerGigsPage() {
         </div>
 
         {err ? (
-          <div className="mt-3 rounded border border-red-200/40 bg-red-400/10 p-3 text-sm text-red-200">{err}</div>
+          <div className="mt-3 rounded border border-red-200 bg-red-50 p-3 text-sm text-red-900">{err}</div>
         ) : null}
 
         {!demoGig && !busy ? (
-          <div className="mt-4 text-sm text-zinc-400">
+          <div className="mt-4 text-sm text-soft">
             Nessun incarico pubblicato. Accedi come Committente e pubblica un incarico.
           </div>
         ) : null}
 
         {demoGig ? (
-          <div className="mt-4 rounded-xl border p-4">
+          <div className="mt-4 rounded-xl border border-light bg-surface p-4">
             <div className="flex items-start justify-between gap-4">
               <div className="space-y-1">
-                <div className="text-sm text-zinc-300">
+                <div className="text-sm text-soft">
                   Prestazione: {jobTypeMap[Number(demoGig.jobTypeId)] || 'Categoria non disponibile'}
                 </div>
-                <div className="text-sm text-zinc-300">Data evento: {dateOnly(demoGig.startTime)}</div>
-                <div className="text-sm text-zinc-300">
+                <div className="text-sm text-soft">Data evento: {dateOnly(demoGig.startTime)}</div>
+                <div className="text-sm text-soft">
                   Compenso: {String(demoGig.payAmount ?? '-')} {demoGig.currency || 'EUR'}
                 </div>
               </div>
@@ -332,7 +357,7 @@ export default function WorkerGigsPage() {
               </button>
             </div>
             {acceptedStatus ? (
-              <div className="mt-3 rounded border border-emerald-200/40 bg-emerald-400/10 p-2 text-sm text-emerald-200">
+              <div className="mt-3 rounded border border-mid bg-blush p-2 text-sm text-main">
                 Candidatura accettata.
               </div>
             ) : null}
@@ -344,13 +369,13 @@ export default function WorkerGigsPage() {
         <div className="flex items-center justify-between">
           <div>
             <div className="badge">Le mie candidature</div>
-            <div className="mt-2 text-sm text-zinc-300">
+            <div className="mt-2 text-sm text-soft">
               Stato aggiornato automatico dopo l&apos;invio (polling leggero).
             </div>
           </div>
         </div>
         {applicationRows.length === 0 ? (
-          <div className="mt-3 text-sm text-zinc-400">Nessuna candidatura inviata.</div>
+          <div className="mt-3 text-sm text-soft">Nessuna candidatura inviata.</div>
         ) : (
           <div className="mt-3 space-y-2">
             {applicationRows.map((b) => {
@@ -366,14 +391,14 @@ export default function WorkerGigsPage() {
               const gig = gigById[b.gigId]
               const highlight = status === 'accepted' || status === 'confirmed'
               return (
-                <div key={b.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-zinc-800 bg-zinc-950/40 p-3">
+                <div key={b.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-light bg-surface p-3">
                   <div className="text-sm">
-                    <div className="font-medium text-amber-50">{gig?.title || `Gig #${b.gigId}`}</div>
-                    <div className="text-xs text-zinc-400">
+                    <div className="font-medium text-main">{gig?.title || `Gig #${b.gigId}`}</div>
+                    <div className="text-xs text-soft">
                       {gig?.venue?.name || gig?.venueName || gig?.venueId || 'Venue'} - {dateOnly(gig?.startTime)}
                     </div>
                   </div>
-                  <span className={`badge ${highlight ? 'border-amber-300/60 bg-amber-400/20 text-amber-100' : ''}`}>
+                  <span className={`badge ${highlight ? 'bg-blush border-mid' : ''}`}>
                     {label}
                   </span>
                 </div>
@@ -385,9 +410,3 @@ export default function WorkerGigsPage() {
     </div>
   )
 }
-
-
-
-
-
-

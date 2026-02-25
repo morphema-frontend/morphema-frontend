@@ -1,10 +1,12 @@
-﻿'use client'
+'use client'
 
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import GatedScreen from '@/components/GatedScreen'
 import TopBar from '@/components/TopBar'
 import { useAuth } from '@/lib/auth'
 import { isVenueRole } from '@/lib/roles'
+import { readReasonCode } from '@/lib/gating'
 
 type JobType = {
   id: number
@@ -99,10 +101,11 @@ export default function NewGigPage() {
 
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
+  const [gateReason, setGateReason] = useState<string | null>(null)
 
   useEffect(() => {
     if (loading) return
-    if (!user) return router.replace('/login')
+    if (!user) return router.replace('/venue/auth/login')
     if (user.role === 'worker') return router.replace('/worker/gigs')
   }, [loading, user, router])
 
@@ -121,8 +124,15 @@ export default function NewGigPage() {
         const vRes = (await fetchAuth('/horeca-venues/me')) as Response
         if (vRes.status === 401) {
           signOut()
-          router.replace('/login')
+          router.replace('/venue/auth/login')
           return
+        }
+        if (vRes.status === 403) {
+          const reason = await readReasonCode(vRes)
+          if (reason) {
+            setGateReason(reason)
+            return
+          }
         }
         if (!vRes.ok) throw new Error(await readError(vRes))
         const vJson = (await vRes.json()) as VenueMe | VenueMe[]
@@ -135,6 +145,13 @@ export default function NewGigPage() {
         let jtList: JobType[] = []
         try {
           const jtRes = await fetchAuth('/job-types/catalog')
+          if (jtRes.status === 403) {
+            const reason = await readReasonCode(jtRes)
+            if (reason) {
+              setGateReason(reason)
+              return
+            }
+          }
           if (!jtRes.ok) throw new Error(await readError(jtRes))
           jtList = normalizeCatalog(await jtRes.json())
         } catch (e: any) {
@@ -148,6 +165,13 @@ export default function NewGigPage() {
 
         // contract templates (auth required)
         const ctRes = await fetchAuth('/contract-templates')
+        if (ctRes.status === 403) {
+          const reason = await readReasonCode(ctRes)
+          if (reason) {
+            setGateReason(reason)
+            return
+          }
+        }
         if (!ctRes.ok) throw new Error(await readError(ctRes))
         const ctList = normalizeList<ContractTemplate>(await ctRes.json())
         setContractTemplates(ctList)
@@ -227,8 +251,15 @@ export default function NewGigPage() {
 
       if (res.status === 401) {
         signOut()
-        router.replace('/login')
+        router.replace('/venue/auth/login')
         return
+      }
+      if (res.status === 403) {
+        const reason = await readReasonCode(res)
+        if (reason) {
+          setGateReason(reason)
+          return
+        }
       }
       if (!res.ok) throw new Error(await readError(res))
 
@@ -242,6 +273,7 @@ export default function NewGigPage() {
 
   if (loading) return <div className="mx-auto mt-20 max-w-md card">Loading...</div>
   if (!user) return <div className="mx-auto mt-20 max-w-md card">Redirecting...</div>
+  if (gateReason) return <GatedScreen reasonCode={gateReason} ctaHref="/venue/onboarding/company" />
 
   const groupedJobTypes = jobTypes.reduce(
     (acc, jt) => {
@@ -262,8 +294,8 @@ export default function NewGigPage() {
         <div className="flex items-start justify-between gap-4">
           <div>
             <div className="badge">Committente</div>
-            <h1 className="mt-2 text-lg font-semibold">Nuovo incarico (demo)</h1>
-            <p className="mt-1 text-sm text-zinc-300">
+            <h1 className="mt-2 text-lg font-semibold text-main">Nuovo incarico (demo)</h1>
+            <p className="mt-1 text-sm text-soft">
               Prestazione autonoma (art. 2222 c.c.) tra Committente e Professionista. Solo Candidatura.
             </p>
           </div>
@@ -283,7 +315,7 @@ export default function NewGigPage() {
         </div>
 
         {err ? (
-          <div className="mt-3 rounded border border-red-200/40 bg-red-400/10 p-3 text-sm text-red-200">{err}</div>
+          <div className="mt-3 rounded border border-red-200 bg-red-50 p-3 text-sm text-red-900">{err}</div>
         ) : null}
 
         <div className="mt-4 grid gap-4 md:grid-cols-2">
@@ -322,7 +354,7 @@ export default function NewGigPage() {
               ) : null}
             </select>
             {catalogErr ? (
-              <div className="mt-2 flex items-center gap-2 text-xs text-amber-200">
+              <div className="mt-2 flex items-center gap-2 text-xs text-soft">
                 <span>{catalogErr}</span>
                 <button className="btn-secondary" onClick={reloadCatalog} type="button">
                   Riprova
@@ -330,7 +362,7 @@ export default function NewGigPage() {
               </div>
             ) : null}
             {selectedEventOnly ? (
-              <div className="mt-2 rounded border border-amber-300/40 bg-amber-400/10 p-2 text-xs text-amber-100">
+              <div className="mt-2 rounded border border-mid bg-blush p-2 text-xs text-main">
                 Solo evento/picco: incarico legato a evento, non turnazione continuativa.
               </div>
             ) : null}

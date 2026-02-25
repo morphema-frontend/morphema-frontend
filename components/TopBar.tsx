@@ -1,6 +1,7 @@
-﻿'use client'
+'use client'
 
 import Link from 'next/link'
+import MorphemaLogo from '@/components/MorphemaLogo'
 import { useAuth } from '@/lib/auth'
 import { isVenueRole } from '@/lib/roles'
 
@@ -14,17 +15,15 @@ export default function TopBar() {
   const { user, signOut } = useAuth()
 
   return (
-    <div className="mb-4 flex items-center justify-between border-b border-zinc-800 px-4 py-3">
-      <div className="font-semibold">
-        <Link href="/" className="no-underline">
-          Morphema
-        </Link>
-      </div>
+    <div className="mb-4 flex items-center justify-between border-b border-light px-4 py-3">
+      <Link href="/" className="no-underline text-main">
+        <MorphemaLogo />
+      </Link>
 
       <div className="flex items-center gap-3 text-sm">
         {user ? (
           <>
-            <span className="text-zinc-300">
+            <span className="text-soft">
               {user.email} ({roleLabel(user.role)})
             </span>
             <button className="btn" onClick={signOut}>

@@ -10,6 +10,7 @@ import React, {
 } from 'react'
 
 import type { UserMe } from './types'
+import { clearTokens, storeTokens } from './api'
 
 type FetchAuthFn = {
   (): Promise<void>
@@ -122,10 +123,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         if (!res.ok) throw new Error(await res.text())
 
-        const data = (await res.json()) as { accessToken: string }
+        const data = (await res.json()) as { accessToken?: string; refreshToken?: string }
         if (!data?.accessToken) throw new Error('Login fallito')
 
-        localStorage.setItem(TOKEN_KEY, data.accessToken)
+        if (data.refreshToken) storeTokens(data.accessToken, data.refreshToken)
+        else localStorage.setItem(TOKEN_KEY, data.accessToken)
         await fetchAuthStable()
       } catch (e: any) {
         setError(e?.message || 'Login fallito')
@@ -139,6 +141,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   )
 
   const signOut = useCallback(() => {
+    clearTokens()
     localStorage.removeItem(TOKEN_KEY)
     localStorage.removeItem('accessToken')
     setUser(null)

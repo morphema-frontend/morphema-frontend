@@ -1,40 +1,48 @@
-﻿'use client'
-
-import Link from 'next/link'
-import { useEffect } from 'react'
-import { useRouter } from 'next/navigation'
-import { useAuth } from '@/lib/auth'
-
-function go(role?: string) {
-  if (role === 'worker') return '/worker/gigs'
-  if (role === 'horeca' || role === 'admin') return '/venue/gigs'
-  return '/login'
-}
+import BuildingsSvg from '@/components/BuildingsSvg'
+import LandingSplit from '@/components/LandingSplit'
+import MorphemaLogo from '@/components/MorphemaLogo'
+import MrMorpSvg from '@/components/MrMorpSvg'
+import PrimaryGhostButton from '@/components/PrimaryGhostButton'
 
 export default function Page() {
-  const { user, loading } = useAuth()
-  const router = useRouter()
-
-  useEffect(() => {
-    if (loading) return
-    if (user) router.replace(go(user.role))
-  }, [loading, user, router])
-
-  if (loading) return <div className="card">Loading...</div>
-  if (user) return <div className="card">Redirecting...</div>
-
   return (
-    <div className="mx-auto mt-16 max-w-3xl px-4">
-      <div className="card space-y-3">
-        <div className="badge">Demo</div>
-        <h1 className="text-2xl font-semibold">Incarico autonomo</h1>
-        <p className="text-zinc-700">
-          Incarico autonomo (art. 2222 c.c.) tra Committente e Professionista occasionale. Solo Candidatura.
-        </p>
-        <Link className="btn" href="/login">
-          Entra nella demo
-        </Link>
-      </div>
+    <div className="landing-shell">
+      <header className="landing-header">
+        <MorphemaLogo />
+      </header>
+
+      <LandingSplit
+        left={
+          <>
+            <div className="landing-kicker">WORK</div>
+            <h1 className="landing-headline">On your terms.</h1>
+            <div className="landing-subtext">
+              <span>Autonomous assignments.</span>
+              <span>Clear contracts.</span>
+              <span>Transparent flow.</span>
+            </div>
+            <div className="landing-visual">
+              <MrMorpSvg />
+            </div>
+            <PrimaryGhostButton href="/worker" label="Enter as Worker" />
+          </>
+        }
+        right={
+          <>
+            <div className="landing-kicker">STRUCTURE</div>
+            <h2 className="landing-headline">Made simple.</h2>
+            <div className="landing-subtext">
+              <span>Publish.</span>
+              <span>Authorize.</span>
+              <span>Operate.</span>
+            </div>
+            <div className="landing-visual">
+              <BuildingsSvg />
+            </div>
+            <PrimaryGhostButton href="/venue" label="Enter as Venue" arrowAccent />
+          </>
+        }
+      />
     </div>
   )
 }

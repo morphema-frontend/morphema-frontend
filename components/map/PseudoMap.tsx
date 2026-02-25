@@ -1,52 +1,21 @@
-'use client'
-
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet'
-import 'leaflet/dist/leaflet.css'
-import L from 'leaflet'
-import React, { useMemo } from 'react'
 import type { Gig } from '@/lib/types'
 
-// Fix default marker icon paths for Next.js
-const DefaultIcon = L.icon({
-  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-})
-L.Marker.prototype.options.icon = DefaultIcon
-
-function jitter(n: number) {
-  // deterministic-ish jitter from integer
-  const x = Math.sin(n * 999) * 10000
-  return x - Math.floor(x)
-}
-
 export function PseudoMap({ gigs }: { gigs: Gig[] }) {
-  // Backend doesn't expose venue coordinates. This map places markers around Rome deterministically.
-  const markers = useMemo(() => {
-    const center: [number, number] = [41.9028, 12.4964]
-    return gigs.map((g) => {
-      const lat = center[0] + (jitter(g.id) - 0.5) * 0.06
-      const lng = center[1] + (jitter(g.id + 42) - 0.5) * 0.08
-      return { g, pos: [lat, lng] as [number, number] }
-    })
-  }, [gigs])
-
   return (
-    <div className="h-[360px] w-full overflow-hidden rounded-xl border border-zinc-200">
-      <MapContainer center={[41.9028, 12.4964]} zoom={12} style={{ height: '360px', width: '100%' }}>
-        <TileLayer attribution="&copy; OpenStreetMap contributors" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-        {markers.map(({ g, pos }) => (
-          <Marker key={g.id} position={pos}>
-            <Popup>
-              <div className="text-sm font-semibold">{g.title}</div>
-              <div className="text-xs">venueId: {g.venueId}</div>
-              <div className="text-xs">jobTypeId: {g.jobTypeId ?? '—'}</div>
-            </Popup>
-          </Marker>
-        ))}
-      </MapContainer>
+    <div className="h-[360px] w-full overflow-hidden rounded-xl border border-light bg-base p-4">
+      <div className="mb-3 flex items-center justify-between text-xs text-soft">
+        <span>Map preview</span>
+        <span>{gigs.length} gigs</span>
+      </div>
+      <svg viewBox="0 0 400 240" width="100%" height="100%" role="img" aria-label="Map preview">
+        <rect x="0" y="0" width="400" height="240" rx="18" fill="#F8F8F8" />
+        <path d="M30 90 L100 70 L170 90 L240 70 L320 90 L360 130 L300 170 L210 150 L130 170 L60 140 Z" fill="#E8E8E8" />
+        <path d="M70 100 L130 90 L190 110 L250 100 L310 120" stroke="#D8D8D8" strokeWidth="4" fill="none" />
+        <circle cx="110" cy="120" r="6" fill="#A0F8F8" />
+        <circle cx="190" cy="140" r="6" fill="#A0F8F8" />
+        <circle cx="270" cy="125" r="6" fill="#A0F8F8" />
+        <circle cx="230" cy="170" r="6" fill="#A0F8F8" />
+      </svg>
     </div>
   )
 }

@@ -36,9 +36,9 @@ export default async function DemoBanner() {
   const disclaimer = (await loadDisclaimer()) || FALLBACK_DISCLAIMER
 
   return (
-    <div className="w-full border-b border-amber-300/30 bg-zinc-950 px-4 py-2 text-sm text-amber-100 shadow-sm shadow-amber-500/10">
+    <div className="w-full border-b border-light bg-base px-4 py-2 text-sm text-soft shadow-sm">
       <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-2">
-        <span className="font-medium text-amber-300">Demo</span>
+        <span className="font-medium text-main">Demo</span>
         <span>{disclaimer}</span>
       </div>
     </div>

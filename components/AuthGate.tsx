@@ -27,7 +27,7 @@ export default function AuthGate({ children, allow }: Props) {
   }, [loading, user, allow, router])
 
   if (loading || !user) {
-    return <div className="p-6 text-sm text-zinc-500">Loading…</div>
+    return <div className="p-6 text-sm text-soft">Loading...</div>
   }
 
   return <>{children}</>

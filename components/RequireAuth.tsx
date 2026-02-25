@@ -18,7 +18,13 @@ export function RequireAuth({
   useEffect(() => {
     if (loading) return
     if (!user) {
-      router.replace('/login')
+      if (roles?.includes('worker') && !roles?.includes('horeca')) {
+        router.replace('/worker/auth/login')
+      } else if (roles?.includes('horeca') || roles?.includes('admin') || roles?.includes('venue')) {
+        router.replace('/venue/auth/login')
+      } else {
+        router.replace('/login')
+      }
       return
     }
     if (roles && roles.length && !roles.includes(user.role as Role)) {

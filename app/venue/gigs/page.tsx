@@ -1,10 +1,12 @@
-﻿'use client'
+'use client'
 
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import GatedScreen from '@/components/GatedScreen'
 import TopBar from '@/components/TopBar'
 import { useAuth } from '@/lib/auth'
 import { isVenueRole } from '@/lib/roles'
+import { readReasonCode } from '@/lib/gating'
 
 type Gig = {
   id: number
@@ -57,12 +59,13 @@ export default function VenueGigsPage() {
   const [insuranceProducts, setInsuranceProducts] = useState<InsuranceProduct[]>([])
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
+  const [gateReason, setGateReason] = useState<string | null>(null)
 
   const canUse = useMemo(() => !!user && isVenueRole(user.role), [user])
 
   useEffect(() => {
     if (loading) return
-    if (!user) return router.replace('/login')
+    if (!user) return router.replace('/venue/auth/login')
     if (user.role === 'worker') return router.replace('/worker/gigs')
   }, [loading, user, router])
 
@@ -71,7 +74,7 @@ export default function VenueGigsPage() {
     const vRes = (await fetchAuth('/horeca-venues/me')) as Response
     if (vRes.status === 401) {
       signOut()
-      router.replace('/login')
+      router.replace('/venue/auth/login')
       return null
     }
     if (!vRes.ok) throw new Error(await readError(vRes))
@@ -94,8 +97,15 @@ export default function VenueGigsPage() {
       const gRes = await fetchAuth(`/gigs?venueId=${venueIdValue}`)
       if (gRes.status === 401) {
         signOut()
-        router.replace('/login')
+        router.replace('/venue/auth/login')
         return
+      }
+      if (gRes.status === 403) {
+        const reason = await readReasonCode(gRes)
+        if (reason) {
+          setGateReason(reason)
+          return
+        }
       }
       if (!gRes.ok) throw new Error(await readError(gRes))
       const gJson = await gRes.json()
@@ -104,8 +114,15 @@ export default function VenueGigsPage() {
       const bRes = await fetchAuth('/bookings')
       if (bRes.status === 401) {
         signOut()
-        router.replace('/login')
+        router.replace('/venue/auth/login')
         return
+      }
+      if (bRes.status === 403) {
+        const reason = await readReasonCode(bRes)
+        if (reason) {
+          setGateReason(reason)
+          return
+        }
       }
       if (!bRes.ok) throw new Error(await readError(bRes))
       const bJson = await bRes.json()
@@ -150,6 +167,13 @@ export default function VenueGigsPage() {
     setErr(null)
     try {
       const res = await fetchAuth(`/gigs/${id}/preauthorize`, { method: 'POST' })
+      if (res.status === 403) {
+        const reason = await readReasonCode(res)
+        if (reason) {
+          setGateReason(reason)
+          return
+        }
+      }
       if (!res.ok) throw new Error(await readError(res))
       await loadAll()
     } catch (e: any) {
@@ -164,6 +188,13 @@ export default function VenueGigsPage() {
     setErr(null)
     try {
       const res = await fetchAuth(`/gigs/${id}/publish`, { method: 'POST' })
+      if (res.status === 403) {
+        const reason = await readReasonCode(res)
+        if (reason) {
+          setGateReason(reason)
+          return
+        }
+      }
       if (!res.ok) throw new Error(await readError(res))
       await loadAll()
     } catch (e: any) {
@@ -210,6 +241,7 @@ export default function VenueGigsPage() {
 
   if (loading) return <div className="mx-auto mt-20 max-w-md card">Loading...</div>
   if (!user) return <div className="mx-auto mt-20 max-w-md card">Redirecting...</div>
+  if (gateReason) return <GatedScreen reasonCode={gateReason} ctaHref="/venue/onboarding/company" />
 
   return (
     <div className="mx-auto max-w-5xl px-4">
@@ -219,8 +251,8 @@ export default function VenueGigsPage() {
         <div className="flex items-start justify-between gap-4">
           <div>
             <div className="badge">Committente</div>
-            <h1 className="mt-2 text-lg font-semibold">Incarico autonomo (demo)</h1>
-            <p className="mt-1 text-sm text-zinc-300">
+            <h1 className="mt-2 text-lg font-semibold text-main">Incarico autonomo (demo)</h1>
+            <p className="mt-1 text-sm text-soft">
               Prestazione autonoma (art. 2222 c.c.) tra Committente e Professionista. Solo Candidatura.
             </p>
           </div>
@@ -236,20 +268,20 @@ export default function VenueGigsPage() {
         </div>
 
         {err ? (
-          <div className="mt-3 rounded border border-red-200/40 bg-red-400/10 p-3 text-sm text-red-200">{err}</div>
+          <div className="mt-3 rounded border border-red-200 bg-red-50 p-3 text-sm text-red-900">{err}</div>
         ) : null}
 
         {!demoGig && !busy ? (
-          <div className="mt-4 text-sm text-zinc-400">Nessun incarico presente. Crea un nuovo incarico.</div>
+          <div className="mt-4 text-sm text-soft">Nessun incarico presente. Crea un nuovo incarico.</div>
         ) : null}
 
         {demoGig ? (
-          <div className="mt-4 rounded-xl border p-4">
+          <div className="mt-4 rounded-xl border border-light bg-surface p-4">
             <div className="flex items-start justify-between gap-4">
               <div className="space-y-1">
-                <div className="text-sm text-zinc-300">Stato: {demoGig.publishStatus || '-'}</div>
-                <div className="text-sm text-zinc-300">Data evento: {dateOnly(demoGig.startTime)}</div>
-                <div className="text-sm text-zinc-300">
+                <div className="text-sm text-soft">Stato: {demoGig.publishStatus || '-'}</div>
+                <div className="text-sm text-soft">Data evento: {dateOnly(demoGig.startTime)}</div>
+                <div className="text-sm text-soft">
                   Compenso: {String(demoGig.payAmount ?? '-')} {demoGig.currency || 'EUR'}
                 </div>
                 <div className="flex flex-wrap gap-2 pt-1">
@@ -277,11 +309,11 @@ export default function VenueGigsPage() {
               </div>
             </div>
 
-            <div className="mt-4 border-t pt-4">
+            <div className="mt-4 border-t border-light pt-4">
               <div className="text-sm font-medium">Candidature (demo)</div>
 
               {pendingForDemoGig.length === 0 ? (
-                <div className="mt-2 text-sm text-zinc-400">
+                <div className="mt-2 text-sm text-soft">
                   Nessuna candidatura in attesa. Accedi come Professionista occasionale e invia la Candidatura.
                 </div>
               ) : (
@@ -289,11 +321,11 @@ export default function VenueGigsPage() {
                   {pendingForDemoGig.map((b) => (
                     <div
                       key={b.id}
-                      className="flex items-center justify-between rounded-lg border border-zinc-800 bg-zinc-950/40 p-3"
+                      className="flex items-center justify-between rounded-lg border border-light bg-surface p-3"
                     >
                       <div className="text-sm">
-                        <div className="font-medium">Candidatura #{b.id}</div>
-                        <div className="text-xs text-zinc-400">Professionista occasionale (userId): {b.workerUserId}</div>
+                        <div className="font-medium text-main">Candidatura #{b.id}</div>
+                        <div className="text-xs text-soft">Professionista occasionale (userId): {b.workerUserId}</div>
                       </div>
                       <button className="btn" disabled={busy} onClick={() => acceptBooking(b.id)}>
                         Accetta candidatura
