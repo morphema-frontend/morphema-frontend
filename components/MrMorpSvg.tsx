@@ -1,38 +1,53 @@
 export default function MrMorpSvg() {
   return (
     <svg
-      width="200"
-      height="220"
-      viewBox="0 0 200 220"
+      width="170"
+      height="170"
+      viewBox="0 0 200 200"
       role="img"
       aria-label="Mr. Morp"
     >
       <defs>
-        <linearGradient id="morp-head" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#303030" />
-          <stop offset="100%" stopColor="#2B2B2B" />
+        <linearGradient id="morp-head" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#3A3A3A" />
+          <stop offset="100%" stopColor="#262626" />
         </linearGradient>
-        <linearGradient id="morp-body" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#303030" />
-          <stop offset="100%" stopColor="#2B2B2B" />
+        <linearGradient id="morp-body" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#373737" />
+          <stop offset="100%" stopColor="#252525" />
         </linearGradient>
-        <filter id="morp-eye-glow" x="-40%" y="-40%" width="180%" height="180%">
-          <feDropShadow dx="0" dy="0" stdDeviation="3" floodColor="#A0F8F8" floodOpacity="0.7" />
+        <linearGradient id="morp-highlight" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="rgba(255,255,255,0.35)" />
+          <stop offset="70%" stopColor="rgba(255,255,255,0)" />
+        </linearGradient>
+        <filter id="morp-eye-glow" x="-60%" y="-60%" width="220%" height="220%">
+          <feDropShadow dx="0" dy="0" stdDeviation="4.5" floodColor="#A0F8F8" floodOpacity="0.5" />
+        </filter>
+        <filter id="morp-shadow" x="-40%" y="-40%" width="180%" height="180%">
+          <feGaussianBlur stdDeviation="6" />
         </filter>
       </defs>
 
-      <rect x="50" y="18" width="100" height="70" rx="14" fill="url(#morp-head)" />
+      <ellipse cx="100" cy="176" rx="42" ry="6" fill="rgba(0, 0, 0, 0.12)" filter="url(#morp-shadow)" />
 
-      <path d="M60 92 L140 92 L128 178 Q100 188 72 178 Z" fill="url(#morp-body)" />
+      <g>
+        <rect x="60" y="42" width="80" height="56" rx="14" fill="url(#morp-head)" />
+        <rect x="62" y="44" width="76" height="24" rx="12" fill="url(#morp-highlight)" />
 
-      <rect x="30" y="110" width="26" height="18" rx="7" fill="#2B2B2B" />
-      <rect x="144" y="110" width="26" height="18" rx="7" fill="#2B2B2B" />
+        <rect x="86" y="66" width="10" height="10" rx="2" fill="#A0F8F8" filter="url(#morp-eye-glow)" />
+        <rect x="104" y="66" width="10" height="10" rx="2" fill="#A0F8F8" filter="url(#morp-eye-glow)" />
+      </g>
 
-      <rect x="76" y="178" width="20" height="26" rx="7" fill="#2B2B2B" />
-      <rect x="104" y="178" width="20" height="26" rx="7" fill="#2B2B2B" />
+      <g>
+        <rect x="72" y="104" width="56" height="52" rx="14" fill="url(#morp-body)" />
+        <rect x="74" y="106" width="52" height="18" rx="9" fill="url(#morp-highlight)" opacity="0.7" />
+      </g>
 
-      <rect x="82" y="44" width="12" height="12" rx="3" fill="#A0F8F8" filter="url(#morp-eye-glow)" />
-      <rect x="106" y="44" width="12" height="12" rx="3" fill="#A0F8F8" filter="url(#morp-eye-glow)" />
+      <rect x="58" y="118" width="10" height="18" rx="5" fill="#2B2B2B" />
+      <rect x="132" y="118" width="10" height="18" rx="5" fill="#2B2B2B" />
+
+      <rect x="82" y="152" width="12" height="22" rx="6" fill="#2B2B2B" />
+      <rect x="106" y="152" width="12" height="22" rx="6" fill="#2B2B2B" />
     </svg>
   )
 }

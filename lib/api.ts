@@ -1,6 +1,15 @@
 import type { AuthResult } from './types'
 
-export const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://127.0.0.1:3000/api'
+export function getApiBase() {
+  if (typeof window !== 'undefined') return '/api'
+  const vercelUrl = process.env.VERCEL_URL
+  if (vercelUrl) return `https://${vercelUrl}/api`
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.SITE_URL
+  if (siteUrl) return `${siteUrl.replace(/\/+$/, '')}/api`
+  return 'http://127.0.0.1:3000/api'
+}
+
+export const API_BASE = getApiBase()
 
 export class ApiError extends Error {
   status: number
@@ -9,6 +18,16 @@ export class ApiError extends Error {
     super(message)
     this.status = status
     this.payload = payload
+  }
+}
+
+export function logApiFailure(err: unknown) {
+  if (!err || typeof err !== 'object') return
+  const status = (err as any).status
+  const payload = (err as any).payload
+  const reason = payload?.reason_code || payload?.reasonCode
+  if (status || reason) {
+    console.error('API error', { status, reason_code: reason })
   }
 }
 

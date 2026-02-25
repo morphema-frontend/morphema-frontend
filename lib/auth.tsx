@@ -10,7 +10,7 @@ import React, {
 } from 'react'
 
 import type { UserMe } from './types'
-import { clearTokens, storeTokens } from './api'
+import { apiFetch, clearTokens, getApiBase, storeTokens } from './api'
 
 type FetchAuthFn = {
   (): Promise<void>
@@ -34,8 +34,20 @@ type AuthContextValue = {
 const AuthContext = createContext<AuthContextValue | null>(null)
 const TOKEN_KEY = 'morphema_accessToken'
 
+const AUTH_TIMEOUT_MS = 10000
+
 function apiBaseFromEnv() {
-  return process.env.NEXT_PUBLIC_API_BASE_URL || 'http://127.0.0.1:3000/api'
+  return getApiBase()
+}
+
+async function fetchWithTimeout(input: RequestInfo, init: RequestInit, timeoutMs: number) {
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
+  try {
+    return await fetch(input, { ...init, signal: controller.signal })
+  } finally {
+    clearTimeout(timeoutId)
+  }
 }
 
 function response401() {
@@ -83,9 +95,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return
       }
 
-      const res = await fetch(`${apiBase}/users/me`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
+      const res = await fetchWithTimeout(
+        `${apiBase}/users/me`,
+        { headers: { Authorization: `Bearer ${token}` } },
+        AUTH_TIMEOUT_MS
+      )
 
       if (!res.ok) {
         localStorage.removeItem(TOKEN_KEY)
@@ -115,15 +129,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setError(null)
 
       try {
-        const res = await fetch(`${apiBase}/auth/login`, {
+        const data = await apiFetch<{ accessToken?: string; refreshToken?: string }>('/auth/login', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          auth: false,
           body: JSON.stringify({ email, password }),
         })
-
-        if (!res.ok) throw new Error(await res.text())
-
-        const data = (await res.json()) as { accessToken?: string; refreshToken?: string }
         if (!data?.accessToken) throw new Error('Login fallito')
 
         if (data.refreshToken) storeTokens(data.accessToken, data.refreshToken)

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import MorphemaLogo from '@/components/MorphemaLogo'
 import { useAuth } from '@/lib/auth'
+import { apiFetch, logApiFailure } from '@/lib/api'
 
 type SignupPayload = {
   email: string
@@ -13,7 +14,7 @@ type SignupPayload = {
 
 export default function VenueSignupPage() {
   const router = useRouter()
-  const { user, loading, apiBase, signIn } = useAuth()
+  const { user, loading, signIn, error: authError } = useAuth()
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -37,16 +38,16 @@ export default function VenueSignupPage() {
     setBusy(true)
     try {
       const payload: SignupPayload = { email, password, role: 'horeca' }
-      const res = await fetch(`${apiBase}/auth/signup`, {
+      await apiFetch('/auth/signup', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        auth: false,
         body: JSON.stringify(payload),
       })
-      if (!res.ok) throw new Error(await res.text())
 
       await signIn(email, password)
       router.replace('/venue/onboarding/company')
     } catch (e: any) {
+      logApiFailure(e)
       setError(e?.message || 'Signup fallito')
     } finally {
       setBusy(false)
@@ -66,7 +67,12 @@ export default function VenueSignupPage() {
           <p className="mt-2 text-sm text-soft">Email e password per iniziare onboarding.</p>
         </div>
 
-        {error ? <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-900">{error}</div> : null}
+        {authError ? (
+          <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-900">{authError}</div>
+        ) : null}
+        {error ? (
+          <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-900">{error}</div>
+        ) : null}
 
         <form className="space-y-3 text-left" onSubmit={handleSubmit}>
           <div>

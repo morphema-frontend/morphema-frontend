@@ -1,6 +1,14 @@
 import { NextResponse } from 'next/server'
 
-const BACKEND = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://127.0.0.1:3000/api'
+const BACKEND_ORIGIN =
+  process.env.BACKEND_ORIGIN ||
+  process.env.NEXT_PUBLIC_API_BASE_URL ||
+  'http://127.0.0.1:3000'
+
+function normalizeOrigin(value: string) {
+  const trimmed = value.trim().replace(/\/+$/, '')
+  return trimmed.endsWith('/api') ? trimmed.slice(0, -4) : trimmed
+}
 
 export const GET = handler
 export const POST = handler
@@ -12,7 +20,8 @@ export const OPTIONS = handler
 async function handler(req: Request, ctx: { params: { path: string[] } }) {
   const path = (ctx.params.path || []).join('/')
   const incomingUrl = new URL(req.url)
-  const url = `${BACKEND}/${path}${incomingUrl.search}`
+  const origin = normalizeOrigin(BACKEND_ORIGIN)
+  const url = `${origin}/api${path ? `/${path}` : ''}${incomingUrl.search}`
 
   const headers = new Headers(req.headers)
   headers.delete('host')

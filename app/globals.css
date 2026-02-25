@@ -309,13 +309,13 @@ a {
 .morphema-logo-row {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 }
 
 .morphema-logo-word {
   font-weight: 600;
   letter-spacing: 0.22em;
-  font-size: 12px;
+  font-size: 14px;
   color: var(--text-main);
 }
 

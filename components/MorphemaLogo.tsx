@@ -4,14 +4,14 @@ export default function MorphemaLogo() {
       <div className="morphema-logo-row">
         <svg
           className="morphema-logo-icon"
-          width="20"
+          width="22"
           height="18"
-          viewBox="0 0 20 18"
+          viewBox="0 0 22 18"
           role="img"
           aria-hidden="true"
         >
-          <rect x="0" y="0" width="20" height="6" rx="2" fill="#484848" opacity="0.85" />
-          <rect x="0" y="10" width="20" height="6" rx="2" fill="#484848" opacity="0.85" />
+          <rect x="0" y="1" width="22" height="6" rx="2.5" fill="#484848" opacity="0.85" />
+          <rect x="0" y="11" width="22" height="6" rx="2.5" fill="#484848" opacity="0.85" />
         </svg>
         <span className="morphema-logo-word">MORPHEMA</span>
       </div>

@@ -8,8 +8,12 @@ const FALLBACK_DISCLAIMER =
   "Prestazione autonoma (art. 2222 c.c.). Il lavoratore e' responsabile degli adempimenti fiscali. Nessuna consulenza legale/fiscale."
 
 async function loadDisclaimer() {
-  const apiBase =
-    process.env.NEXT_PUBLIC_API_BASE_URL || 'http://127.0.0.1:3000/api'
+  const { headers } = await import('next/headers')
+  const hdrs = headers()
+  const proto = hdrs.get('x-forwarded-proto') || 'http'
+  const host = hdrs.get('x-forwarded-host') || hdrs.get('host')
+  const origin = host ? `${proto}://${host}` : null
+  const apiBase = origin ? `${origin}/api` : 'http://127.0.0.1:3000/api'
   try {
     const res = await fetch(`${apiBase}/compliance/disclaimer`, {
       next: { revalidate: 300 },

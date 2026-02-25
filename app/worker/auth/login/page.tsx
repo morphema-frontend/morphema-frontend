@@ -4,10 +4,11 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import MorphemaLogo from '@/components/MorphemaLogo'
 import { useAuth } from '@/lib/auth'
+import { logApiFailure } from '@/lib/api'
 
 export default function WorkerLoginPage() {
   const router = useRouter()
-  const { user, loading, signIn } = useAuth()
+  const { user, loading, signIn, error: authError } = useAuth()
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -31,6 +32,7 @@ export default function WorkerLoginPage() {
       await signIn(email, password)
       router.replace('/worker/dashboard')
     } catch (e: any) {
+      logApiFailure(e)
       setError(e?.message || 'Login fallito')
     } finally {
       setBusy(false)
@@ -50,7 +52,12 @@ export default function WorkerLoginPage() {
           <p className="mt-2 text-sm text-soft">Inserisci le credenziali per continuare.</p>
         </div>
 
-        {error ? <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-900">{error}</div> : null}
+        {authError ? (
+          <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-900">{authError}</div>
+        ) : null}
+        {error ? (
+          <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-900">{error}</div>
+        ) : null}
 
         <form className="space-y-3 text-left" onSubmit={handleSubmit}>
           <div>
