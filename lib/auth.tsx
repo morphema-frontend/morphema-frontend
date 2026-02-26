@@ -92,11 +92,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       if (!token) {
         setUser(null)
+        setLoading(false)
         return
       }
 
       const res = await fetchWithTimeout(
-        `${apiBase}/users/me`,
+        `${apiBase}/auth/me`,
         { headers: { Authorization: `Bearer ${token}` } },
         AUTH_TIMEOUT_MS
       )

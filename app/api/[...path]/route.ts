@@ -22,6 +22,7 @@ async function handler(req: Request, ctx: { params: { path: string[] } }) {
   const incomingUrl = new URL(req.url)
   const origin = normalizeOrigin(BACKEND_ORIGIN)
   const url = `${origin}/api${path ? `/${path}` : ''}${incomingUrl.search}`
+  const isAuthRoute = path.startsWith('auth')
 
   const headers = new Headers(req.headers)
   headers.delete('host')
@@ -36,6 +37,7 @@ async function handler(req: Request, ctx: { params: { path: string[] } }) {
     headers,
     body: hasBody ? await req.arrayBuffer() : undefined,
     redirect: 'manual',
+    cache: isAuthRoute ? 'no-store' : 'default',
   })
 
   const resHeaders = new Headers(upstream.headers)

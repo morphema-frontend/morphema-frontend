@@ -38,7 +38,7 @@ export default function WorkerSignupPage() {
     setBusy(true)
     try {
       const payload: SignupPayload = { email, password, role: 'worker' }
-      await apiFetch('/auth/signup', {
+      await apiFetch('/auth/register', {
         method: 'POST',
         auth: false,
         body: JSON.stringify(payload),

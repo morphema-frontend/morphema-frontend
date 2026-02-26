@@ -38,7 +38,7 @@ export default function VenueSignupPage() {
     setBusy(true)
     try {
       const payload: SignupPayload = { email, password, role: 'horeca' }
-      await apiFetch('/auth/signup', {
+      await apiFetch('/auth/register', {
         method: 'POST',
         auth: false,
         body: JSON.stringify(payload),
