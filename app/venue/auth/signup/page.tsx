@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import MorphemaLogo from '@/components/MorphemaLogo'
 import { useAuth } from '@/lib/auth'
-import { apiFetch, logApiFailure } from '@/lib/api'
+import { ApiError, apiFetch, logApiFailure } from '@/lib/api'
 
 type SignupPayload = {
   email: string
@@ -47,8 +47,13 @@ export default function VenueSignupPage() {
       await signIn(email, password)
       router.replace('/venue/onboarding/company')
     } catch (e: any) {
-      logApiFailure(e)
-      setError(e?.message || 'Signup fallito')
+      if (e instanceof ApiError && e.status === 409) {
+        console.error('Register conflict', e.payload)
+        setError('Email gia registrata. Prova login o usa un\'altra email.')
+      } else {
+        logApiFailure(e)
+        setError(e?.message || 'Signup fallito')
+      }
     } finally {
       setBusy(false)
     }
