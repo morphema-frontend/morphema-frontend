@@ -62,8 +62,8 @@ function isoRangeForEventDate(dateStr: string) {
 export default function VenueDashboardPage() {
   const router = useRouter()
   const { user, loading, error, fetchAuth, signOut } = useAuth()
-  const auditHeaders = useMemo(
-    () => (user ? { 'x-actor-id': String(user.id), 'x-actor-role': user.role } : {}),
+  const auditHeaders = useMemo<HeadersInit | undefined>(
+    () => (user ? { 'x-actor-id': String(user.id), 'x-actor-role': String(user.role) } : undefined),
     [user],
   )
 

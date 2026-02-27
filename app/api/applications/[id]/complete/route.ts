@@ -20,8 +20,8 @@ export async function POST(req: Request, ctx: { params: { id: string } }) {
   }
   const id = parseId(ctx.params.id)
   if (!id) return NextResponse.json({ error: 'ID non valido' }, { status: 400 })
-  const ctx = await auditContextFromRequest(req)
-  const result = await completeApplication(id, ctx.actorUserId || 'unknown', ctx)
+  const auditCtx = await auditContextFromRequest(req)
+  const result = await completeApplication(id, auditCtx.actorUserId || 'unknown', auditCtx)
   if (!result) return NextResponse.json({ error: 'Candidatura non trovata' }, { status: 404 })
   if ('error' in result) {
     const status = (result as any).status || 409

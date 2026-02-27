@@ -40,8 +40,8 @@ async function readError(res: Response) {
 export default function WorkerGigsPage() {
   const router = useRouter()
   const { user, loading, fetchAuth, signOut } = useAuth()
-  const auditHeaders = useMemo(
-    () => (user ? { 'x-actor-id': String(user.id), 'x-actor-role': user.role } : {}),
+  const auditHeaders = useMemo<HeadersInit | undefined>(
+    () => (user ? { 'x-actor-id': String(user.id), 'x-actor-role': String(user.role) } : undefined),
     [user],
   )
 
@@ -124,7 +124,7 @@ export default function WorkerGigsPage() {
       const res = (await fetchAuth(`/gigs/${gigId}/apply`, {
         method: 'POST',
         headers: { ...auditHeaders, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ workerName: user?.name || 'Worker' }),
+        body: JSON.stringify({ workerName: user?.email || 'Worker' }),
       })) as Response
       if (res.status === 401) {
         signOut()

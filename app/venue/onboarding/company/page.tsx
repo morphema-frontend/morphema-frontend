@@ -49,7 +49,7 @@ function saveDraft(draft: VenueDraft) {
 
 export default function VenueCompanyPage() {
   const router = useRouter()
-  const { user, loading, error } = useAuth()
+  const { user, loading, error: authError } = useAuth()
 
   const [draft, setDraft] = useState<VenueDraft>({
     legalName: '',
@@ -69,7 +69,7 @@ export default function VenueCompanyPage() {
     repPhone: '',
     consents: { privacy: false, tos: false, venueDeclaration: false },
   })
-  const [error, setError] = useState<string | null>(null)
+  const [formError, setFormError] = useState<string | null>(null)
 
   useEffect(() => {
     const saved = loadDraft()
@@ -78,8 +78,8 @@ export default function VenueCompanyPage() {
 
   useEffect(() => {
     if (loading) return
-    if (!user && error !== 'role_mismatch') router.replace('/venue/auth/login')
-  }, [loading, user, error, router])
+    if (!user && authError !== 'role_mismatch') router.replace('/venue/auth/login')
+  }, [loading, user, authError, router])
 
   function update(next: Partial<VenueDraft>) {
     const merged = { ...draft, ...next }
@@ -93,27 +93,27 @@ export default function VenueCompanyPage() {
   }
 
   function goNext() {
-    setError(null)
+    setFormError(null)
     if (!draft.legalName || !draft.vatNumber || !draft.ateco) {
-      return setError('Compila ragione sociale, P.IVA e ATECO.')
+      return setFormError('Compila ragione sociale, P.IVA e ATECO.')
     }
     if (!draft.addressLine || !draft.city || !draft.province || !draft.zipCode || !draft.country) {
-      return setError('Compila la sede legale completa.')
+      return setFormError('Compila la sede legale completa.')
     }
     if (!draft.repFirstName || !draft.repLastName || !draft.repTaxCode || !draft.repBirthDate) {
-      return setError('Compila i dati del rappresentante legale.')
+      return setFormError('Compila i dati del rappresentante legale.')
     }
     if (!draft.repEmail.includes('@') || draft.repPhone.length < 6) {
-      return setError('Inserisci email e telefono validi.')
+      return setFormError('Inserisci email e telefono validi.')
     }
     if (!draft.consents.privacy || !draft.consents.tos || !draft.consents.venueDeclaration) {
-      return setError('Accetta tutti i consensi richiesti.')
+      return setFormError('Accetta tutti i consensi richiesti.')
     }
     router.push('/venue/onboarding/review')
   }
 
   if (loading) return <div className="mx-auto mt-20 max-w-md card">Loading...</div>
-  if (error === 'role_mismatch') return <ForbiddenScreen />
+  if (authError === 'role_mismatch') return <ForbiddenScreen />
 
   return (
     <div className="mx-auto max-w-5xl px-4">
@@ -126,7 +126,7 @@ export default function VenueCompanyPage() {
           <p className="mt-1 text-sm text-soft">Inserisci i dati fiscali e legali della struttura.</p>
         </div>
 
-        {error ? <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-900">{error}</div> : null}
+        {formError ? <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-900">{formError}</div> : null}
 
         <div className="grid gap-4 md:grid-cols-2">
           <div>

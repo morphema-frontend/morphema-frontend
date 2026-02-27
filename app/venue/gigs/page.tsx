@@ -67,7 +67,7 @@ export default function VenueGigsPage() {
   useEffect(() => {
     if (loading) return
     if (!user && error !== 'role_mismatch') return router.replace('/venue/auth/login')
-    if (user.role === 'worker') return router.replace('/worker/gigs')
+    if (user?.role === 'worker') return router.replace('/worker/gigs')
   }, [loading, user, error, router])
 
   async function resolveVenueId() {
