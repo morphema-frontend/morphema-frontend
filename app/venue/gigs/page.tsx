@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import GatedScreen from '@/components/GatedScreen'
+import ForbiddenScreen from '@/components/ForbiddenScreen'
 import TopBar from '@/components/TopBar'
 import { useAuth } from '@/lib/auth'
 import { isVenueRole } from '@/lib/roles'
@@ -50,7 +51,7 @@ async function readError(res: Response) {
 
 export default function VenueGigsPage() {
   const router = useRouter()
-  const { user, loading, fetchAuth, signOut, apiBase } = useAuth()
+  const { user, loading, fetchAuth, signOut, apiBase, error } = useAuth()
 
   const [gigs, setGigs] = useState<Gig[]>([])
   const [bookings, setBookings] = useState<Booking[]>([])
@@ -65,9 +66,9 @@ export default function VenueGigsPage() {
 
   useEffect(() => {
     if (loading) return
-    if (!user) return router.replace('/venue/auth/login')
+    if (!user && error !== 'role_mismatch') return router.replace('/venue/auth/login')
     if (user.role === 'worker') return router.replace('/worker/gigs')
-  }, [loading, user, router])
+  }, [loading, user, error, router])
 
   async function resolveVenueId() {
     if (venueId) return venueId
@@ -240,6 +241,7 @@ export default function VenueGigsPage() {
   }
 
   if (loading) return <div className="mx-auto mt-20 max-w-md card">Loading...</div>
+  if (error === 'role_mismatch') return <ForbiddenScreen />
   if (!user) return <div className="mx-auto mt-20 max-w-md card">Redirecting...</div>
   if (gateReason) return <GatedScreen reasonCode={gateReason} ctaHref="/venue/onboarding/company" />
 

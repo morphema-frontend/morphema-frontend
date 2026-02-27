@@ -11,6 +11,8 @@ import React, {
 
 import type { UserMe } from './types'
 import { apiFetch, clearTokens, getApiBase, storeTokens } from './api'
+import { readReasonCode } from './gating'
+import { logAuditClient } from './auditClient'
 
 type FetchAuthFn = {
   (): Promise<void>
@@ -103,6 +105,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         AUTH_TIMEOUT_MS
       )
 
+      if (res.status === 403) {
+        const reason = await readReasonCode(res)
+        if (reason === 'role_mismatch') {
+          setError('role_mismatch')
+          setUser(null)
+          return
+        }
+      }
+
       if (!res.ok) {
         clearTokens()
         localStorage.removeItem(TOKEN_KEY)
@@ -143,6 +154,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (data.refreshToken) storeTokens(data.accessToken, data.refreshToken)
         else localStorage.setItem(TOKEN_KEY, data.accessToken)
         await fetchAuthStable()
+        await logAuditClient(
+          { action: 'login', entityType: 'session', entityId: data?.accessToken || '' },
+          null,
+          { actorUserId: email, actorRole: 'unknown', actorEmail: email }
+        )
       } catch (e: any) {
         setError(e?.message || 'Login fallito')
         setUser(null)
@@ -155,11 +171,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   )
 
   const signOut = useCallback(() => {
+    if (user) {
+      logAuditClient(
+        { action: 'logout', entityType: 'session', entityId: String(user.sessionId || user.id) },
+        user
+      )
+    }
     clearTokens()
     localStorage.removeItem(TOKEN_KEY)
     localStorage.removeItem('accessToken')
     setUser(null)
-  }, [])
+  }, [user])
 
   useEffect(() => {
     fetchAuthStable()

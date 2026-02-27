@@ -5,6 +5,7 @@ import { getStoredTokens } from '@/lib/api'
 
 type UploadResult = {
   fileId: string
+  url: string
 }
 
 type UploadDropzoneProps = {
@@ -12,6 +13,7 @@ type UploadDropzoneProps = {
   apiBase: string
   accept: string
   maxSizeMb: number
+  uploaded?: UploadResult | null
   onUploaded: (result: UploadResult) => void
 }
 
@@ -31,16 +33,20 @@ export default function UploadDropzone({
   apiBase,
   accept,
   maxSizeMb,
+  uploaded,
   onUploaded,
 }: UploadDropzoneProps) {
   const inputRef = useRef<HTMLInputElement | null>(null)
-  const [file, setFile] = useState<File | null>(null)
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [uploadedFile, setUploadedFile] = useState<UploadResult | null>(uploaded ?? null)
   const [error, setError] = useState<string | null>(null)
   const [progress, setProgress] = useState(0)
   const [uploading, setUploading] = useState(false)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
 
   const maxBytes = maxSizeMb * 1024 * 1024
+  const allowedMime = ['image/jpeg', 'image/png']
+  const allowedExtensions = ['.jpg', '.jpeg', '.png']
 
   const reset = useCallback(() => {
     setError(null)
@@ -48,12 +54,26 @@ export default function UploadDropzone({
     setUploading(false)
   }, [])
 
+  const isAllowedFile = useCallback(
+    (file: File) => {
+      if (allowedMime.includes(file.type)) return true
+      const lower = file.name.toLowerCase()
+      return allowedExtensions.some((ext) => lower.endsWith(ext))
+    },
+    [allowedExtensions, allowedMime],
+  )
+
   const handleFile = useCallback(
     (nextFile: File | null) => {
       reset()
       if (!nextFile) {
-        setFile(null)
+        setSelectedFile(null)
         setPreviewUrl(null)
+        return
+      }
+
+      if (!isAllowedFile(nextFile)) {
+        setError('Formato non supportato. Usa JPG o PNG.')
         return
       }
 
@@ -62,14 +82,15 @@ export default function UploadDropzone({
         return
       }
 
-      setFile(nextFile)
+      setSelectedFile(nextFile)
+      setUploadedFile(null)
       if (isImage(nextFile)) {
         setPreviewUrl(URL.createObjectURL(nextFile))
       } else {
         setPreviewUrl(null)
       }
     },
-    [maxBytes, maxSizeMb, reset],
+    [isAllowedFile, maxBytes, maxSizeMb, reset],
   )
 
   const handleDrop = useCallback(
@@ -82,12 +103,12 @@ export default function UploadDropzone({
   )
 
   const handleUpload = useCallback(() => {
-    if (!file) return
+    if (!selectedFile) return
     setUploading(true)
     setError(null)
 
     const xhr = new XMLHttpRequest()
-    xhr.open('POST', `${apiBase}/files/upload`)
+    xhr.open('POST', `${apiBase}/uploads`)
 
     const { accessToken } = getStoredTokens()
     if (accessToken) xhr.setRequestHeader('Authorization', `Bearer ${accessToken}`)
@@ -106,12 +127,16 @@ export default function UploadDropzone({
       }
       try {
         const payload = JSON.parse(xhr.responseText)
-        const fileId = String(payload?.file_id || payload?.fileId || payload?.id || '')
-        if (!fileId) {
-          setError('Upload completato ma file_id mancante')
+        const fileId = String(payload?.fileId || payload?.file_id || payload?.id || '')
+        const url = String(payload?.url || '')
+        if (!fileId || !url) {
+          setError('Upload completato ma risposta incompleta')
           return
         }
-        onUploaded({ fileId })
+        const result = { fileId, url }
+        setUploadedFile(result)
+        setProgress(100)
+        onUploaded(result)
       } catch {
         setError('Risposta upload non valida')
       }
@@ -123,14 +148,27 @@ export default function UploadDropzone({
     }
 
     const form = new FormData()
-    form.append('file', file)
+    form.append('file', selectedFile)
     xhr.send(form)
-  }, [apiBase, file, onUploaded])
+  }, [apiBase, onUploaded, selectedFile])
 
   const fileLabel = useMemo(() => {
-    if (!file) return 'Nessun file selezionato'
-    return `${file.name} (${formatBytes(file.size)})`
-  }, [file])
+    if (!selectedFile) return 'Nessun file selezionato'
+    return `${selectedFile.name} (${formatBytes(selectedFile.size)})`
+  }, [selectedFile])
+
+  const uploadStatus = uploadedFile ? 'Caricato' : 'Da caricare'
+
+  React.useEffect(() => {
+    if (uploaded?.fileId && uploaded?.url) {
+      setUploadedFile((current) => {
+        if (current?.fileId === uploaded.fileId && current?.url === uploaded.url) return current
+        return uploaded
+      })
+      return
+    }
+    setUploadedFile(null)
+  }, [uploaded?.fileId, uploaded?.url])
 
   return (
     <div className="rounded-xl border border-light bg-surface p-4">
@@ -145,13 +183,14 @@ export default function UploadDropzone({
         ) : null}
         <div>{fileLabel}</div>
         <div className="text-xs text-soft">Drag & drop oppure seleziona un file.</div>
+        <div className="text-xs text-soft">Formati: JPG/PNG - Max {maxSizeMb}MB</div>
         <button
           className="btn-secondary"
           type="button"
           onClick={() => inputRef.current?.click()}
           disabled={uploading}
         >
-          Scegli file
+          Sfoglia
         </button>
         <input
           ref={inputRef}
@@ -163,8 +202,11 @@ export default function UploadDropzone({
       </div>
       {error ? <div className="mt-3 text-xs text-red-600">{error}</div> : null}
       <div className="mt-3 flex items-center justify-between gap-3">
-        <div className="text-xs text-soft">Progress: {progress}%</div>
-        <button className="btn" type="button" onClick={handleUpload} disabled={!file || uploading}>
+        <div className="text-xs text-soft">
+          {uploading ? `Caricamento ${progress}%` : `Stato: ${uploadStatus}`}
+          {uploadedFile?.url ? ` - ${uploadedFile.url}` : ''}
+        </div>
+        <button className="btn" type="button" onClick={handleUpload} disabled={!selectedFile || uploading}>
           {uploading ? 'Caricamento...' : 'Carica file'}
         </button>
       </div>

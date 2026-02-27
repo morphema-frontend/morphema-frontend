@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import MorphemaLogo from '@/components/MorphemaLogo'
 import { useAuth } from '@/lib/auth'
+import { logAuditClient } from '@/lib/auditClient'
 import { ApiError, apiFetch, logApiFailure } from '@/lib/api'
 
 type SignupPayload = {
@@ -43,6 +44,11 @@ export default function WorkerSignupPage() {
         auth: false,
         body: JSON.stringify(payload),
       })
+      await logAuditClient(
+        { action: 'register', entityType: 'user', entityId: email, payload: { role: 'worker' } },
+        null,
+        { actorUserId: email, actorRole: 'worker', actorEmail: email },
+      )
 
       await signIn(email, password)
       router.replace('/worker/onboarding/identity')

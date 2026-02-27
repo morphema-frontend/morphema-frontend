@@ -10,6 +10,9 @@ type WorkerDraft = {
   documentFrontId?: string
   documentBackId?: string
   profilePhotoId?: string
+  documentFrontUrl?: string
+  documentBackUrl?: string
+  profilePhotoUrl?: string
   addressLine: string
   city: string
   province: string
@@ -49,6 +52,9 @@ export default function WorkerIdentityPage() {
     documentFrontId: '',
     documentBackId: '',
     profilePhotoId: '',
+    documentFrontUrl: '',
+    documentBackUrl: '',
+    profilePhotoUrl: '',
     addressLine: '',
     city: '',
     province: '',
@@ -80,17 +86,43 @@ export default function WorkerIdentityPage() {
     update({ consents: next })
   }
 
+  const missingUploads = {
+    documentFront: !draft.documentFrontId || !draft.documentFrontUrl,
+    documentBack: !draft.documentBackId || !draft.documentBackUrl,
+    profilePhoto: !draft.profilePhotoId || !draft.profilePhotoUrl,
+  }
+
+  const missingResidence = {
+    addressLine: !draft.addressLine.trim(),
+    city: !draft.city.trim(),
+    province: !draft.province.trim(),
+    zipCode: !draft.zipCode.trim(),
+    country: !draft.country.trim(),
+  }
+
+  const missingTaxCode = draft.taxCode.trim().length < 8
+  const missingConsents =
+    !draft.consents.privacy || !draft.consents.tos || !draft.consents.workerDeclaration
+
+  const missingItems = [
+    missingUploads.documentFront ? 'Documento fronte' : null,
+    missingUploads.documentBack ? 'Documento retro' : null,
+    missingUploads.profilePhoto ? 'Foto profilo' : null,
+    missingResidence.addressLine ? 'Indirizzo' : null,
+    missingResidence.city ? 'Citta' : null,
+    missingResidence.province ? 'Provincia' : null,
+    missingResidence.zipCode ? 'CAP' : null,
+    missingResidence.country ? 'Paese' : null,
+    missingTaxCode ? 'Codice fiscale' : null,
+    missingConsents ? 'Consensi' : null,
+  ].filter(Boolean)
+
+  const formValid = missingItems.length === 0
+
   function goNext() {
     setError(null)
-    if (!draft.documentFrontId || !draft.documentBackId || !draft.profilePhotoId) {
-      return setError('Carica documento fronte/retro e foto profilo.')
-    }
-    if (!draft.addressLine || !draft.city || !draft.province || !draft.zipCode || !draft.country) {
-      return setError('Compila la residenza completa.')
-    }
-    if (draft.taxCode.length < 8) return setError('Codice fiscale non valido.')
-    if (!draft.consents.privacy || !draft.consents.tos || !draft.consents.workerDeclaration) {
-      return setError('Accetta tutti i consensi richiesti.')
+    if (!formValid) {
+      return setError('Completa i campi richiesti evidenziati.')
     }
     router.push('/worker/onboarding/review')
   }
@@ -111,27 +143,57 @@ export default function WorkerIdentityPage() {
         {error ? <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-900">{error}</div> : null}
 
         <div className="grid gap-4 md:grid-cols-3">
-          <UploadDropzone
-            label="Documento fronte"
-            apiBase={apiBase}
-            accept=".jpg,.jpeg,.png,.pdf"
-            maxSizeMb={8}
-            onUploaded={(result) => update({ documentFrontId: result.fileId })}
-          />
-          <UploadDropzone
-            label="Documento retro"
-            apiBase={apiBase}
-            accept=".jpg,.jpeg,.png,.pdf"
-            maxSizeMb={8}
-            onUploaded={(result) => update({ documentBackId: result.fileId })}
-          />
-          <UploadDropzone
-            label="Foto profilo"
-            apiBase={apiBase}
-            accept=".jpg,.jpeg,.png"
-            maxSizeMb={5}
-            onUploaded={(result) => update({ profilePhotoId: result.fileId })}
-          />
+          <div className="space-y-2">
+            <UploadDropzone
+              label="Documento fronte"
+              apiBase={apiBase}
+              accept=".jpg,.jpeg,.png"
+              maxSizeMb={8}
+              uploaded={
+                draft.documentFrontId && draft.documentFrontUrl
+                  ? { fileId: draft.documentFrontId, url: draft.documentFrontUrl }
+                  : null
+              }
+              onUploaded={(result) => update({ documentFrontId: result.fileId, documentFrontUrl: result.url })}
+            />
+            {missingUploads.documentFront ? (
+              <div className="text-xs text-red-600">Carica documento fronte.</div>
+            ) : null}
+          </div>
+          <div className="space-y-2">
+            <UploadDropzone
+              label="Documento retro"
+              apiBase={apiBase}
+              accept=".jpg,.jpeg,.png"
+              maxSizeMb={8}
+              uploaded={
+                draft.documentBackId && draft.documentBackUrl
+                  ? { fileId: draft.documentBackId, url: draft.documentBackUrl }
+                  : null
+              }
+              onUploaded={(result) => update({ documentBackId: result.fileId, documentBackUrl: result.url })}
+            />
+            {missingUploads.documentBack ? (
+              <div className="text-xs text-red-600">Carica documento retro.</div>
+            ) : null}
+          </div>
+          <div className="space-y-2">
+            <UploadDropzone
+              label="Foto profilo"
+              apiBase={apiBase}
+              accept=".jpg,.jpeg,.png"
+              maxSizeMb={5}
+              uploaded={
+                draft.profilePhotoId && draft.profilePhotoUrl
+                  ? { fileId: draft.profilePhotoId, url: draft.profilePhotoUrl }
+                  : null
+              }
+              onUploaded={(result) => update({ profilePhotoId: result.fileId, profilePhotoUrl: result.url })}
+            />
+            {missingUploads.profilePhoto ? (
+              <div className="text-xs text-red-600">Carica foto profilo.</div>
+            ) : null}
+          </div>
         </div>
 
         <div className="grid gap-4 md:grid-cols-2">
@@ -142,10 +204,14 @@ export default function WorkerIdentityPage() {
               value={draft.addressLine}
               onChange={(e) => update({ addressLine: e.target.value })}
             />
+            {missingResidence.addressLine ? (
+              <div className="mt-1 text-xs text-red-600">Indirizzo obbligatorio.</div>
+            ) : null}
           </div>
           <div>
             <label className="text-sm font-medium">Citta</label>
             <input className="input mt-1" value={draft.city} onChange={(e) => update({ city: e.target.value })} />
+            {missingResidence.city ? <div className="mt-1 text-xs text-red-600">Citta obbligatoria.</div> : null}
           </div>
           <div>
             <label className="text-sm font-medium">Provincia</label>
@@ -154,6 +220,9 @@ export default function WorkerIdentityPage() {
               value={draft.province}
               onChange={(e) => update({ province: e.target.value })}
             />
+            {missingResidence.province ? (
+              <div className="mt-1 text-xs text-red-600">Provincia obbligatoria.</div>
+            ) : null}
           </div>
           <div>
             <label className="text-sm font-medium">CAP</label>
@@ -162,6 +231,7 @@ export default function WorkerIdentityPage() {
               value={draft.zipCode}
               onChange={(e) => update({ zipCode: e.target.value })}
             />
+            {missingResidence.zipCode ? <div className="mt-1 text-xs text-red-600">CAP obbligatorio.</div> : null}
           </div>
           <div>
             <label className="text-sm font-medium">Paese</label>
@@ -170,6 +240,7 @@ export default function WorkerIdentityPage() {
               value={draft.country}
               onChange={(e) => update({ country: e.target.value })}
             />
+            {missingResidence.country ? <div className="mt-1 text-xs text-red-600">Paese obbligatorio.</div> : null}
           </div>
           <div>
             <label className="text-sm font-medium">Codice fiscale</label>
@@ -178,6 +249,9 @@ export default function WorkerIdentityPage() {
               value={draft.taxCode}
               onChange={(e) => update({ taxCode: e.target.value.toUpperCase() })}
             />
+            {missingTaxCode ? (
+              <div className="mt-1 text-xs text-red-600">Codice fiscale non valido.</div>
+            ) : null}
           </div>
         </div>
 
@@ -199,10 +273,21 @@ export default function WorkerIdentityPage() {
             />
             Dichiarazione worker (v1)
           </label>
+          {missingConsents ? (
+            <div className="text-xs text-red-600">Accetta tutti i consensi richiesti.</div>
+          ) : null}
         </div>
 
-        <div className="flex justify-end">
-          <button className="btn" type="button" onClick={goNext}>
+        <div className="flex flex-wrap justify-between gap-2">
+          <div className="flex gap-2">
+            <button className="btn-secondary" type="button" onClick={() => router.back()}>
+              Indietro
+            </button>
+            <button className="btn-secondary" type="button" onClick={() => router.push('/')}>
+              Home
+            </button>
+          </div>
+          <button className="btn" type="button" onClick={goNext} disabled={!formValid}>
             Vai alla review
           </button>
         </div>

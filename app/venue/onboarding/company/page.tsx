@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import TopBar from '@/components/TopBar'
+import ForbiddenScreen from '@/components/ForbiddenScreen'
 import { useAuth } from '@/lib/auth'
 
 type VenueDraft = {
@@ -48,7 +49,7 @@ function saveDraft(draft: VenueDraft) {
 
 export default function VenueCompanyPage() {
   const router = useRouter()
-  const { user, loading } = useAuth()
+  const { user, loading, error } = useAuth()
 
   const [draft, setDraft] = useState<VenueDraft>({
     legalName: '',
@@ -77,8 +78,8 @@ export default function VenueCompanyPage() {
 
   useEffect(() => {
     if (loading) return
-    if (!user) router.replace('/venue/auth/login')
-  }, [loading, user, router])
+    if (!user && error !== 'role_mismatch') router.replace('/venue/auth/login')
+  }, [loading, user, error, router])
 
   function update(next: Partial<VenueDraft>) {
     const merged = { ...draft, ...next }
@@ -112,6 +113,7 @@ export default function VenueCompanyPage() {
   }
 
   if (loading) return <div className="mx-auto mt-20 max-w-md card">Loading...</div>
+  if (error === 'role_mismatch') return <ForbiddenScreen />
 
   return (
     <div className="mx-auto max-w-5xl px-4">

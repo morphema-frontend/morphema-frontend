@@ -4,11 +4,15 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import TopBar from '@/components/TopBar'
 import { useAuth } from '@/lib/auth'
+import { logAuditClient } from '@/lib/auditClient'
 
 type WorkerDraft = {
   documentFrontId?: string
   documentBackId?: string
   profilePhotoId?: string
+  documentFrontUrl?: string
+  documentBackUrl?: string
+  profilePhotoUrl?: string
   addressLine: string
   city: string
   province: string
@@ -43,6 +47,21 @@ export default function WorkerReviewPage() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  const missingItems = !draft
+    ? []
+    : [
+        !draft.documentFrontId || !draft.documentFrontUrl ? 'Documento fronte' : null,
+        !draft.documentBackId || !draft.documentBackUrl ? 'Documento retro' : null,
+        !draft.profilePhotoId || !draft.profilePhotoUrl ? 'Foto profilo' : null,
+        !draft.addressLine?.trim() ? 'Indirizzo' : null,
+        !draft.city?.trim() ? 'Citta' : null,
+        !draft.province?.trim() ? 'Provincia' : null,
+        !draft.zipCode?.trim() ? 'CAP' : null,
+        !draft.country?.trim() ? 'Paese' : null,
+        !draft.taxCode || draft.taxCode.trim().length < 8 ? 'Codice fiscale' : null,
+        !draft.consents?.privacy || !draft.consents?.tos || !draft.consents?.workerDeclaration ? 'Consensi' : null,
+      ].filter(Boolean)
+
   useEffect(() => {
     const saved = loadDraft()
     setDraft(saved)
@@ -55,6 +74,10 @@ export default function WorkerReviewPage() {
 
   async function submit() {
     if (!draft) return
+    if (missingItems.length > 0) {
+      setError('Dati mancanti: ' + missingItems.join(', '))
+      return
+    }
     setBusy(true)
     setError(null)
     try {
@@ -84,6 +107,10 @@ export default function WorkerReviewPage() {
         body: JSON.stringify(payload),
       })
       if (!res.ok) throw new Error(await res.text())
+      await logAuditClient(
+        { action: 'onboarding_submit', entityType: 'worker', entityId: String(user?.id || '') },
+        user
+      )
       router.replace('/worker/dashboard')
     } catch (e: any) {
       setError(e?.message || 'Invio onboarding fallito')
@@ -109,25 +136,40 @@ export default function WorkerReviewPage() {
         {!draft ? (
           <div className="text-sm text-soft">Nessun dato disponibile. Torna indietro.</div>
         ) : (
-          <div className="grid gap-3 text-sm text-soft">
-            <div>Documento fronte: {draft.documentFrontId || '-'}</div>
-            <div>Documento retro: {draft.documentBackId || '-'}</div>
-            <div>Foto profilo: {draft.profilePhotoId || '-'}</div>
-            <div>Indirizzo: {draft.addressLine}</div>
-            <div>
-              Citta: {draft.city} ({draft.province}) {draft.zipCode}
+          <>
+            {missingItems.length > 0 ? (
+              <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                Mancano: {missingItems.join(', ')}
+              </div>
+            ) : null}
+            <div className="grid gap-3 text-sm text-soft">
+              <div>Documento fronte: {draft.documentFrontId || '-'}</div>
+              <div>Documento fronte URL: {draft.documentFrontUrl || '-'}</div>
+              <div>Documento retro: {draft.documentBackId || '-'}</div>
+              <div>Documento retro URL: {draft.documentBackUrl || '-'}</div>
+              <div>Foto profilo: {draft.profilePhotoId || '-'}</div>
+              <div>Foto profilo URL: {draft.profilePhotoUrl || '-'}</div>
+              <div>Indirizzo: {draft.addressLine}</div>
+              <div>
+                Citta: {draft.city} ({draft.province}) {draft.zipCode}
+              </div>
+              <div>Paese: {draft.country}</div>
+              <div>Codice fiscale: {draft.taxCode}</div>
+              <div>Consensi: {draft.consents.privacy && draft.consents.tos && draft.consents.workerDeclaration ? 'Ok' : 'Non completo'}</div>
             </div>
-            <div>Paese: {draft.country}</div>
-            <div>Codice fiscale: {draft.taxCode}</div>
-            <div>Consensi: {draft.consents.privacy && draft.consents.tos && draft.consents.workerDeclaration ? 'Ok' : 'Non completo'}</div>
-          </div>
+          </>
         )}
 
-        <div className="flex justify-between">
-          <button className="btn-secondary" type="button" onClick={() => router.back()}>
-            Indietro
-          </button>
-          <button className="btn" type="button" onClick={submit} disabled={busy || !draft}>
+        <div className="flex flex-wrap justify-between gap-2">
+          <div className="flex gap-2">
+            <button className="btn-secondary" type="button" onClick={() => router.back()}>
+              Indietro
+            </button>
+            <button className="btn-secondary" type="button" onClick={() => router.push('/')}>
+              Home
+            </button>
+          </div>
+          <button className="btn" type="button" onClick={submit} disabled={busy || !draft || missingItems.length > 0}>
             {busy ? 'Invio...' : 'Invia onboarding'}
           </button>
         </div>

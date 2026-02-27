@@ -2,40 +2,28 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import GatedScreen from '@/components/GatedScreen'
 import TopBar from '@/components/TopBar'
+import GatedScreen from '@/components/GatedScreen'
 import { useAuth } from '@/lib/auth'
 import { readReasonCode } from '@/lib/gating'
 
 type Gig = {
   id: number
-  title?: string
-  publishStatus?: string
-  payAmount?: string | number | null
-  currency?: string
+  title: string
+  status: 'draft' | 'published' | 'accepted' | 'completed' | 'settled'
+  payAmount: number
+  currency: string
   startTime?: string
   endTime?: string
-  jobTypeId?: number | null
-  venue?: { name?: string; [k: string]: any }
-  venueName?: string
-  venueId?: number
-  insuranceProductId?: number | null
-  insuranceSnapshot?: { name?: string; [k: string]: any } | null
-  contractTemplateId?: number | null
-  contractSnapshot?: { name?: string; [k: string]: any } | null
-  [k: string]: any
 }
 
-type JobType = {
+type Application = {
   id: number
-  name: string
-  eventOnly?: boolean
-  isEventOnly?: boolean
-  riskLevel?: string
-  group?: string
-  [k: string]: any
+  gigId: number
+  workerName: string
+  status: 'pending' | 'accepted' | 'completed' | 'rejected'
+  appliedAt: string
 }
-type Booking = { id: number; gigId: number; status?: string; [k: string]: any }
 
 function dateOnly(iso?: string) {
   if (!iso) return '-'
@@ -44,54 +32,24 @@ function dateOnly(iso?: string) {
   return d.toLocaleDateString()
 }
 
-function normalizeList<T>(json: any): T[] {
-  if (Array.isArray(json?.value)) return json.value as T[]
-  if (Array.isArray(json)) return json as T[]
-  return []
-}
-
-function normalizeCatalog(json: any): JobType[] {
-  if (Array.isArray(json?.value)) return json.value as JobType[]
-  if (Array.isArray(json?.items)) return json.items as JobType[]
-  if (Array.isArray(json)) return json as JobType[]
-  if (json && typeof json === 'object') {
-    const core = Array.isArray(json.core) ? json.core : []
-    const eventOnly = Array.isArray(json.eventOnly) ? json.eventOnly : []
-    return [...core, ...eventOnly] as JobType[]
-  }
-  return []
-}
-
 async function readError(res: Response) {
   const text = await res.text()
-  if (!text) return `${res.status} ${res.statusText}`
-  try {
-    const parsed = JSON.parse(text)
-    return parsed?.message || parsed?.error || text
-  } catch {
-    return text
-  }
-}
-
-function isAlreadyApplied(message: string) {
-  const msg = message.toLowerCase()
-  return msg.includes('already') || msg.includes('gia') || msg.includes('esiste') || msg.includes('exist')
+  return text || `${res.status} ${res.statusText}`
 }
 
 export default function WorkerGigsPage() {
   const router = useRouter()
   const { user, loading, fetchAuth, signOut } = useAuth()
+  const auditHeaders = useMemo(
+    () => (user ? { 'x-actor-id': String(user.id), 'x-actor-role': user.role } : {}),
+    [user],
+  )
 
-  const [allGigs, setAllGigs] = useState<Gig[]>([])
-  const [publishedGigs, setPublishedGigs] = useState<Gig[]>([])
-  const [jobTypeMap, setJobTypeMap] = useState<Record<number, string>>({})
-  const [appliedIds, setAppliedIds] = useState<Record<number, boolean>>({})
-  const [bookingStatus, setBookingStatus] = useState<Record<number, string>>({})
-  const [bookings, setBookings] = useState<Booking[]>([])
-  const [polling, setPolling] = useState(false)
-  const [pollStartedAt, setPollStartedAt] = useState<number | null>(null)
+  const [gigs, setGigs] = useState<Gig[]>([])
+  const [applications, setApplications] = useState<Application[]>([])
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
+  const [toast, setToast] = useState<string | null>(null)
   const [gateReason, setGateReason] = useState<string | null>(null)
 
   const canUse = useMemo(() => !!user && user.role === 'worker', [user])
@@ -99,152 +57,83 @@ export default function WorkerGigsPage() {
   useEffect(() => {
     if (loading) return
     if (!user) return router.replace('/worker/auth/login')
-    if (user.role !== 'worker') return router.replace('/venue/gigs')
+    if (user.role !== 'worker') return router.replace('/venue/dashboard')
   }, [loading, user, router])
 
-  async function loadApplications() {
+  async function loadGigs() {
     if (!canUse) return
-    const bRes = await fetchAuth('/bookings')
-    if (bRes.status === 401) {
+    setErr(null)
+    const res = (await fetchAuth('/gigs', { headers: auditHeaders })) as Response
+    if (res.status === 401) {
       signOut()
       router.replace('/worker/auth/login')
       return
     }
-    if (bRes.status === 403) {
-      const reason = await readReasonCode(bRes)
+    if (res.status === 403) {
+      const reason = await readReasonCode(res)
       if (reason) {
         setGateReason(reason)
         return
       }
     }
-    if (!bRes.ok) throw new Error(await readError(bRes))
-    const bList = normalizeList<Booking>(await bRes.json())
-    const applied: Record<number, boolean> = {}
-    const statusMap: Record<number, string> = {}
-    bList.forEach((b) => {
-      if (!b?.gigId) return
-      applied[Number(b.gigId)] = true
-      if (b.status) statusMap[Number(b.gigId)] = String(b.status).toLowerCase()
-    })
-    setAppliedIds(applied)
-    setBookingStatus(statusMap)
-    setBookings(bList)
-    return bList
+    if (!res.ok) throw new Error(await readError(res))
+    const data = (await res.json()) as Gig[]
+    setGigs(Array.isArray(data) ? data : [])
   }
 
-  async function loadGigs() {
+  async function loadApplications() {
     if (!canUse) return
-    setBusy(true)
-    setErr(null)
-    try {
-      const res = await fetchAuth('/gigs')
-      if (res.status === 401) {
-        signOut()
-        router.replace('/worker/auth/login')
+    const res = (await fetchAuth('/worker/applications', { headers: auditHeaders })) as Response
+    if (res.status === 401) {
+      signOut()
+      router.replace('/worker/auth/login')
+      return
+    }
+    if (res.status === 403) {
+      const reason = await readReasonCode(res)
+      if (reason) {
+        setGateReason(reason)
         return
       }
-      if (res.status === 403) {
-        const reason = await readReasonCode(res)
-        if (reason) {
-          setGateReason(reason)
-          return
-        }
-      }
-      if (!res.ok) throw new Error(await readError(res))
-      const json = await res.json()
-      const list = Array.isArray(json) ? json : []
-      setAllGigs(list)
-      setPublishedGigs(list.filter((g: any) => String(g.publishStatus).toLowerCase() === 'published'))
-
-      const jtRes = await fetchAuth('/job-types/catalog')
-      if (jtRes.ok) {
-        const jtList = normalizeCatalog(await jtRes.json())
-        const map: Record<number, string> = {}
-        jtList.forEach((jt) => {
-          if (jt?.id) map[Number(jt.id)] = jt.name
-        })
-        setJobTypeMap(map)
-      }
-
-      await loadApplications()
-    } catch (e: any) {
-      setErr(e?.message || 'Errore nel caricamento')
-    } finally {
-      setBusy(false)
     }
+    if (!res.ok) throw new Error(await readError(res))
+    const data = (await res.json()) as Application[]
+    setApplications(Array.isArray(data) ? data : [])
   }
 
   useEffect(() => {
     if (!canUse) return
-    loadGigs()
+    ;(async () => {
+      setBusy(true)
+      try {
+        await loadGigs()
+        await loadApplications()
+      } catch (e: any) {
+        setErr(e?.message || 'Errore nel caricamento')
+      } finally {
+        setBusy(false)
+      }
+    })()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canUse])
-
-  useEffect(() => {
-    if (!polling) return
-    if (!pollStartedAt) return
-    let timer: ReturnType<typeof setTimeout> | null = null
-
-    const tick = async () => {
-      if (document.visibilityState !== 'visible') {
-        timer = setTimeout(tick, 5000)
-        return
-      }
-      const latest = (await loadApplications()) || []
-      const accepted = latest.some((b) => {
-        const status = String(b.status || '').toLowerCase()
-        return status === 'accepted' || status === 'confirmed'
-      })
-      const elapsed = Date.now() - pollStartedAt
-      if (accepted || elapsed > 120000) {
-        setPolling(false)
-        return
-      }
-      timer = setTimeout(tick, 5000)
-    }
-
-    timer = setTimeout(tick, 5000)
-    return () => {
-      if (timer) clearTimeout(timer)
-    }
-  }, [polling, pollStartedAt, bookings])
-
-  const demoGig = publishedGigs.find((g) => bookingStatus[g.id]) ?? publishedGigs?.[0] ?? null
-  const demoGigStatus = demoGig ? bookingStatus[demoGig.id] : ''
-  const acceptedStatus = demoGigStatus === 'accepted' || demoGigStatus === 'confirmed'
-  const gigById = useMemo(() => {
-    const map: Record<number, Gig> = {}
-    allGigs.forEach((g) => {
-      map[g.id] = g
-    })
-    return map
-  }, [allGigs])
-
-  const acceptedBooking = bookings.find((b) => {
-    const status = String(b.status || '').toLowerCase()
-    return status === 'accepted' || status === 'confirmed'
-  })
-  const acceptedGig = acceptedBooking ? gigById[acceptedBooking.gigId] : null
 
   async function apply(gigId: number) {
     setBusy(true)
     setErr(null)
     try {
-      const res = await fetchAuth('/bookings', {
+      const res = (await fetchAuth(`/gigs/${gigId}/apply`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ gigId }),
-      })
+        headers: { ...auditHeaders, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ workerName: user?.name || 'Worker' }),
+      })) as Response
       if (res.status === 401) {
         signOut()
         router.replace('/worker/auth/login')
         return
       }
       if (res.ok) {
-        setAppliedIds((prev) => ({ ...prev, [gigId]: true }))
-        setPolling(true)
-        setPollStartedAt(Date.now())
-        await loadGigs()
+        await loadApplications()
+        setToast('Candidatura inviata.')
         return
       }
       if (res.status === 403) {
@@ -254,16 +143,30 @@ export default function WorkerGigsPage() {
           return
         }
       }
-      const body = await readError(res)
-      if (res.status === 409 || (res.status === 400 && isAlreadyApplied(body))) {
-        setAppliedIds((prev) => ({ ...prev, [gigId]: true }))
-        setPolling(true)
-        setPollStartedAt(Date.now())
-        return
-      }
-      throw new Error(body)
+      throw new Error(await readError(res))
     } catch (e: any) {
       setErr(e?.message || 'Invio candidatura fallito')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function markCompleted(applicationId: number) {
+    setBusy(true)
+    setErr(null)
+    try {
+      const res = (await fetchAuth(`/applications/${applicationId}/complete`, { method: 'POST', headers: auditHeaders })) as Response
+      if (res.status === 401) {
+        signOut()
+        router.replace('/worker/auth/login')
+        return
+      }
+      if (!res.ok) throw new Error(await readError(res))
+      await loadApplications()
+      await loadGigs()
+      setToast('Prestazione completata.')
+    } catch (e: any) {
+      setErr(e?.message || 'Completamento fallito')
     } finally {
       setBusy(false)
     }
@@ -273,38 +176,31 @@ export default function WorkerGigsPage() {
   if (!user) return <div className="mx-auto mt-20 max-w-md card">Redirecting...</div>
   if (gateReason) return <GatedScreen reasonCode={gateReason} ctaHref="/worker/onboarding/identity" />
 
-  const applicationRows = bookings
-    .slice()
-    .sort((a, b) => Number(b.id) - Number(a.id))
-    .slice(0, 5)
+  const applicationMap = applications.reduce<Record<number, Application>>((acc, app) => {
+    acc[app.gigId] = app
+    return acc
+  }, {})
+
+  const acceptedApp = applications.find((app) => app.status === 'accepted')
+  const acceptedGig = acceptedApp ? gigs.find((g) => g.id === acceptedApp.gigId) : null
 
   return (
     <div className="mx-auto max-w-5xl px-4">
       <TopBar />
 
-      {acceptedGig ? (
+      {acceptedApp && acceptedGig ? (
         <div className="card card-accent mb-4 border-mid bg-blush">
-          <div className="text-lg font-semibold text-main">Sei stato selezionato {'\u2705'}</div>
+          <div className="text-lg font-semibold text-main">Sei stato selezionato</div>
           <div className="mt-2 text-sm text-soft">
-            {acceptedGig.title || 'Prestazione autonoma'} - {acceptedGig.venue?.name || acceptedGig.venueName || acceptedGig.venueId || 'Venue'}
+            {acceptedGig.title} - {dateOnly(acceptedGig.startTime)}
           </div>
           <div className="mt-2 text-sm text-soft">
-            Turno: {dateOnly(acceptedGig.startTime)} - {String(acceptedGig.payAmount ?? '-')} {acceptedGig.currency || 'EUR'}
+            Compenso: {acceptedGig.payAmount} {acceptedGig.currency}
           </div>
-          <div className="mt-2 flex flex-wrap gap-2">
-            {acceptedGig.contractSnapshot?.name || acceptedGig.contractTemplateId ? (
-              <span className="badge">
-                Contratto: {acceptedGig.contractSnapshot?.name || `Template #${acceptedGig.contractTemplateId}`}
-              </span>
-            ) : null}
-            {acceptedGig.insuranceSnapshot?.name || acceptedGig.insuranceProductId ? (
-              <span className="badge">
-                Assicurazione: {acceptedGig.insuranceSnapshot?.name || `Prodotto #${acceptedGig.insuranceProductId}`}
-              </span>
-            ) : null}
-          </div>
-          <div className="mt-3 rounded border border-light bg-surface p-2 text-xs text-soft">
-            Prestazione autonoma (art. 2222 c.c.). Responsabilita' fiscale al lavoratore.
+          <div className="mt-3">
+            <button className="btn" type="button" onClick={() => markCompleted(acceptedApp.id)} disabled={busy}>
+              Segna come completato
+            </button>
           </div>
         </div>
       ) : null}
@@ -312,100 +208,64 @@ export default function WorkerGigsPage() {
       <div className="card">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <div className="badge">Professionista occasionale</div>
-            <h1 className="mt-2 text-lg font-semibold text-main">Incarico autonomo (demo)</h1>
-            <p className="mt-1 text-sm text-soft">
-              Prestazione autonoma (art. 2222 c.c.) tra Committente e Professionista. Solo Candidatura.
-            </p>
+            <div className="badge">Worker</div>
+            <h1 className="mt-2 text-lg font-semibold text-main">Gigs disponibili</h1>
+            <p className="mt-1 text-sm text-soft">Candidati, attendi l&apos;accettazione e completa il gig.</p>
           </div>
-
           <div className="flex gap-2">
             <button className="btn-secondary" onClick={loadGigs} disabled={busy}>
-              Aggiorna
+              Aggiorna gigs
             </button>
             <button className="btn-secondary" onClick={loadApplications} disabled={busy}>
-              Refresh candidature
+              Aggiorna candidature
             </button>
           </div>
         </div>
 
-        {err ? (
-          <div className="mt-3 rounded border border-red-200 bg-red-50 p-3 text-sm text-red-900">{err}</div>
+        {toast ? <div className="mt-3 rounded border border-green-200 bg-green-50 p-3 text-sm text-green-900">{toast}</div> : null}
+        {err ? <div className="mt-3 rounded border border-red-200 bg-red-50 p-3 text-sm text-red-900">{err}</div> : null}
+
+        {gigs.length === 0 && !busy ? (
+          <div className="mt-4 text-sm text-soft">Nessun gig pubblicato.</div>
         ) : null}
 
-        {!demoGig && !busy ? (
-          <div className="mt-4 text-sm text-soft">
-            Nessun incarico pubblicato. Accedi come Committente e pubblica un incarico.
-          </div>
-        ) : null}
-
-        {demoGig ? (
-          <div className="mt-4 rounded-xl border border-light bg-surface p-4">
-            <div className="flex items-start justify-between gap-4">
-              <div className="space-y-1">
-                <div className="text-sm text-soft">
-                  Prestazione: {jobTypeMap[Number(demoGig.jobTypeId)] || 'Categoria non disponibile'}
-                </div>
-                <div className="text-sm text-soft">Data evento: {dateOnly(demoGig.startTime)}</div>
-                <div className="text-sm text-soft">
-                  Compenso: {String(demoGig.payAmount ?? '-')} {demoGig.currency || 'EUR'}
-                </div>
-              </div>
-
-              <button className="btn" disabled={busy || appliedIds[demoGig.id]} onClick={() => apply(demoGig.id)}>
-                {appliedIds[demoGig.id] ? 'Candidatura inviata' : 'Invia candidatura'}
-              </button>
-            </div>
-            {acceptedStatus ? (
-              <div className="mt-3 rounded border border-mid bg-blush p-2 text-sm text-main">
-                Candidatura accettata.
-              </div>
-            ) : null}
-          </div>
-        ) : null}
-      </div>
-
-      <div className="card mt-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="badge">Le mie candidature</div>
-            <div className="mt-2 text-sm text-soft">
-              Stato aggiornato automatico dopo l&apos;invio (polling leggero).
-            </div>
-          </div>
-        </div>
-        {applicationRows.length === 0 ? (
-          <div className="mt-3 text-sm text-soft">Nessuna candidatura inviata.</div>
-        ) : (
-          <div className="mt-3 space-y-2">
-            {applicationRows.map((b) => {
-              const status = String(b.status || '').toLowerCase()
-              const label =
-                status === 'pending'
-                  ? 'In revisione'
-                  : status === 'accepted' || status === 'confirmed'
-                  ? 'Accettato'
-                  : status === 'rejected'
-                  ? 'Non selezionato'
-                  : status || '-'
-              const gig = gigById[b.gigId]
-              const highlight = status === 'accepted' || status === 'confirmed'
-              return (
-                <div key={b.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-light bg-surface p-3">
-                  <div className="text-sm">
-                    <div className="font-medium text-main">{gig?.title || `Gig #${b.gigId}`}</div>
+        <div className="mt-4 space-y-3">
+          {gigs.map((gig) => {
+            const app = applicationMap[gig.id]
+            const status = app?.status || ''
+            const label =
+              status === 'pending'
+                ? 'In revisione'
+                : status === 'accepted'
+                ? 'Accettato'
+                : status === 'completed'
+                ? 'Completato'
+                : status === 'rejected'
+                ? 'Rifiutato'
+                : ''
+            const canApply = !app && gig.status === 'published'
+            return (
+              <div key={gig.id} className="rounded border border-light bg-surface p-3">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="space-y-1">
+                    <div className="text-sm font-medium text-main">{gig.title}</div>
                     <div className="text-xs text-soft">
-                      {gig?.venue?.name || gig?.venueName || gig?.venueId || 'Venue'} - {dateOnly(gig?.startTime)}
+                      Data: {dateOnly(gig.startTime)} - Compenso: {gig.payAmount} {gig.currency}
                     </div>
+                    {label ? <span className="badge">{label}</span> : null}
                   </div>
-                  <span className={`badge ${highlight ? 'bg-blush border-mid' : ''}`}>
-                    {label}
-                  </span>
+                  <div className="flex gap-2">
+                    {canApply ? (
+                      <button className="btn" type="button" onClick={() => apply(gig.id)} disabled={busy}>
+                        Candidati
+                      </button>
+                    ) : null}
+                  </div>
                 </div>
-              )
-            })}
-          </div>
-        )}
+              </div>
+            )
+          })}
+        </div>
       </div>
     </div>
   )

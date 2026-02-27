@@ -3,7 +3,9 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import TopBar from '@/components/TopBar'
+import ForbiddenScreen from '@/components/ForbiddenScreen'
 import { useAuth } from '@/lib/auth'
+import { logAuditClient } from '@/lib/auditClient'
 
 type VenueDraft = {
   legalName: string
@@ -43,7 +45,7 @@ function loadDraft(): VenueDraft | null {
 
 export default function VenueReviewPage() {
   const router = useRouter()
-  const { user, loading, apiBase } = useAuth()
+  const { user, loading, fetchAuth, error: authError } = useAuth()
 
   const [draft, setDraft] = useState<VenueDraft | null>(null)
   const [busy, setBusy] = useState(false)
@@ -56,8 +58,8 @@ export default function VenueReviewPage() {
 
   useEffect(() => {
     if (loading) return
-    if (!user) router.replace('/venue/auth/login')
-  }, [loading, user, router])
+    if (!user && authError !== 'role_mismatch') router.replace('/venue/auth/login')
+  }, [loading, user, authError, router])
 
   async function submit() {
     if (!draft) return
@@ -92,12 +94,16 @@ export default function VenueReviewPage() {
         },
       }
 
-      const res = await fetch(`${apiBase}/venue/onboarding/submit`, {
+      const res = (await fetchAuth('/venue/onboarding/submit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
-      })
+      })) as Response
       if (!res.ok) throw new Error(await res.text())
+      await logAuditClient(
+        { action: 'onboarding_submit', entityType: 'venue', entityId: String(user?.id || '') },
+        user
+      )
       router.replace('/venue/dashboard')
     } catch (e: any) {
       setError(e?.message || 'Invio onboarding fallito')
@@ -107,6 +113,7 @@ export default function VenueReviewPage() {
   }
 
   if (loading) return <div className="mx-auto mt-20 max-w-md card">Loading...</div>
+  if (authError === 'role_mismatch') return <ForbiddenScreen />
 
   return (
     <div className="mx-auto max-w-4xl px-4">
