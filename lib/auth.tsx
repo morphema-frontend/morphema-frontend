@@ -83,6 +83,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return fetch(`${apiBase}${path}`, {
         ...init,
         headers,
+        credentials: 'include',
       })
     }
 
@@ -98,12 +99,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       const res = await fetchWithTimeout(
         `${apiBase}/auth/me`,
-        { headers: { Authorization: `Bearer ${token}` } },
+        { headers: { Authorization: `Bearer ${token}` }, credentials: 'include' },
         AUTH_TIMEOUT_MS
       )
 
       if (!res.ok) {
+        clearTokens()
         localStorage.removeItem(TOKEN_KEY)
+        localStorage.removeItem('accessToken')
         setUser(null)
         return
       }

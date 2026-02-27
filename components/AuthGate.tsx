@@ -11,7 +11,7 @@ type Props = {
 
 export default function AuthGate({ children, allow }: Props) {
   const router = useRouter()
-  const { user, loading } = useAuth()
+  const { user, loading, error } = useAuth()
 
   useEffect(() => {
     if (loading) return
@@ -27,7 +27,20 @@ export default function AuthGate({ children, allow }: Props) {
   }, [loading, user, allow, router])
 
   if (loading || !user) {
-    return <div className="p-6 text-sm text-soft">Loading...</div>
+    return (
+      <div className="p-6 text-sm text-soft">
+        {error ? (
+          <div className="space-y-2">
+            <div>{error}</div>
+            <button className="btn-secondary" type="button" onClick={() => window.location.reload()}>
+              Retry
+            </button>
+          </div>
+        ) : (
+          'Loading...'
+        )}
+      </div>
+    )
   }
 
   return <>{children}</>

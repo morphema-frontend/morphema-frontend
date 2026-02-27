@@ -72,6 +72,7 @@ export async function apiFetch<T>(path: string, opts: RequestInit & { auth?: boo
   const res = await fetch(`${API_BASE}${path}`, {
     ...init,
     headers,
+    credentials: 'include',
   })
 
   if (!res.ok) {

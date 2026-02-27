@@ -47,8 +47,22 @@ async function handler(req: Request, ctx: { params: { path: string[] } }) {
   resHeaders.delete('access-control-allow-headers')
   resHeaders.delete('access-control-allow-methods')
 
-  return new NextResponse(upstream.body, {
+  const res = new NextResponse(upstream.body, {
     status: upstream.status,
     headers: resHeaders,
   })
+
+  const getSetCookie = (upstream.headers as any).getSetCookie
+  const setCookies: string[] | undefined = typeof getSetCookie === 'function' ? getSetCookie.call(upstream.headers) : undefined
+  if (setCookies && setCookies.length) {
+    res.headers.delete('set-cookie')
+    setCookies.forEach((cookie) => res.headers.append('set-cookie', cookie))
+  } else {
+    const fallbackCookie = upstream.headers.get('set-cookie')
+    if (fallbackCookie) {
+      res.headers.set('set-cookie', fallbackCookie)
+    }
+  }
+
+  return res
 }
