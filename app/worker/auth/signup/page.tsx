@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import MorphemaLogo from '@/components/MorphemaLogo'
 import { useAuth } from '@/lib/auth'
 import { logAuditClient } from '@/lib/auditClient'
+import type { ApiResponse } from '@/lib/api'
 import { ApiError, apiFetch, logApiFailure } from '@/lib/api'
 
 type SignupPayload = {
@@ -31,6 +32,7 @@ export default function WorkerSignupPage() {
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault()
+    if (busy) return
     setError(null)
     if (!email.includes('@')) return setError('Email non valida')
     if (password.length < 8) return setError('Password troppo corta (min 8 caratteri)')
@@ -50,7 +52,14 @@ export default function WorkerSignupPage() {
         { actorUserId: email, actorRole: 'worker', actorEmail: email },
       )
 
-      await signIn(email, password)
+      const result = (await signIn(email, password)) as ApiResponse<any>
+      if (!result.ok) {
+        if (result.status === 400) setError('Compila email e password')
+        else if (result.status === 401) setError('Credenziali non valide')
+        else if (result.status >= 500) setError('Errore server, riprova')
+        else setError(result.error?.message || 'Login fallito')
+        return
+      }
       router.replace('/worker/onboarding/identity')
     } catch (e: any) {
       if (e instanceof ApiError && e.status === 409) {

@@ -10,7 +10,7 @@ import React, {
 } from 'react'
 
 import type { UserMe } from './types'
-import { apiFetch, clearTokens, getApiBase, storeTokens } from './api'
+import { apiFetch, apiRequest, clearTokens, getApiBase, logApiConfig, storeTokens, type ApiResponse } from './api'
 import { readReasonCode } from './gating'
 import { logAuditClient } from './auditClient'
 
@@ -27,7 +27,10 @@ type AuthContextValue = {
   error: string | null
   apiBase: string
 
-  signIn: (email: string, password: string) => Promise<void>
+  signIn: (
+    email: string,
+    password: string
+  ) => Promise<ApiResponse<{ accessToken?: string; refreshToken?: string }>>
   signOut: () => void
 
   fetchAuth: FetchAuthFn
@@ -144,25 +147,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setError(null)
 
       try {
-        const data = await apiFetch<{ accessToken?: string; refreshToken?: string }>('/auth/login', {
+        const result = await apiRequest<{ accessToken?: string; refreshToken?: string }>('/auth/login', {
           method: 'POST',
           auth: false,
           body: JSON.stringify({ email, password }),
         })
-        if (!data?.accessToken) throw new Error('Login fallito')
+        if (!result.ok || !result.data?.accessToken) {
+          const message = result.error?.message || 'Login fallito'
+          setError(message)
+          setUser(null)
+          return result
+        }
 
-        if (data.refreshToken) storeTokens(data.accessToken, data.refreshToken)
-        else localStorage.setItem(TOKEN_KEY, data.accessToken)
+        if (result.data.refreshToken) storeTokens(result.data.accessToken, result.data.refreshToken)
+        else localStorage.setItem(TOKEN_KEY, result.data.accessToken)
         await fetchAuthStable()
         await logAuditClient(
-          { action: 'login', entityType: 'session', entityId: data?.accessToken || '' },
+          { action: 'login', entityType: 'session', entityId: result.data?.accessToken || '' },
           null,
           { actorUserId: email, actorRole: 'unknown', actorEmail: email }
         )
+        return result
       } catch (e: any) {
         setError(e?.message || 'Login fallito')
         setUser(null)
-        throw e
+        return { ok: false, status: 500, data: null, error: { message: e?.message || 'Login fallito' } }
       } finally {
         setLoading(false)
       }
@@ -184,6 +193,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [user])
 
   useEffect(() => {
+    logApiConfig()
     fetchAuthStable()
   }, [fetchAuthStable])
 

@@ -38,12 +38,19 @@ async function loadDisclaimer() {
 
 export default async function DemoBanner() {
   const disclaimer = (await loadDisclaimer()) || FALLBACK_DISCLAIMER
+  const commit = process.env.NEXT_PUBLIC_COMMIT_SHA || process.env.VERCEL_GIT_COMMIT_SHA || ''
+  const version = process.env.NEXT_PUBLIC_APP_VERSION || ''
+  const buildLabel = version ? `v${version}` : 'v?'
+  const shaLabel = commit ? commit.slice(0, 7) : 'local'
 
   return (
     <div className="w-full border-b border-light bg-base px-4 py-2 text-sm text-soft shadow-sm">
       <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-2">
         <span className="font-medium text-main">Demo</span>
         <span>{disclaimer}</span>
+        <span className="ml-auto text-xs text-soft">
+          API {process.env.NEXT_PUBLIC_API_BASE_URL || '/api'} - {buildLabel} ({shaLabel})
+        </span>
       </div>
     </div>
   )

@@ -10,6 +10,17 @@ export function getApiBase() {
 }
 
 export const API_BASE = getApiBase()
+let apiConfigLogged = false
+
+export function logApiConfig() {
+  if (typeof window === 'undefined') return
+  if (process.env.NODE_ENV !== 'development') return
+  if (apiConfigLogged) return
+  apiConfigLogged = true
+  const version = process.env.NEXT_PUBLIC_APP_VERSION || ''
+  const sha = process.env.NEXT_PUBLIC_COMMIT_SHA || ''
+  console.info('[morphema] api', { base: getApiBase(), version, sha })
+}
 
 export class ApiError extends Error {
   status: number
@@ -19,6 +30,13 @@ export class ApiError extends Error {
     this.status = status
     this.payload = payload
   }
+}
+
+export type ApiResponse<T> = {
+  ok: boolean
+  status: number
+  data: T | null
+  error: { message: string; code?: string } | null
 }
 
 export function logApiFailure(err: unknown) {
@@ -82,6 +100,36 @@ export async function apiFetch<T>(path: string, opts: RequestInit & { auth?: boo
   }
 
   return (await parseJsonSafe(res)) as T
+}
+
+export async function apiRequest<T>(path: string, opts: RequestInit & { auth?: boolean } = {}): Promise<ApiResponse<T>> {
+  const { auth = true, ...init } = opts
+  const headers = new Headers(init.headers || {})
+  headers.set('Content-Type', 'application/json')
+
+  if (auth) {
+    const { accessToken } = getStoredTokens()
+    if (accessToken) headers.set('Authorization', `Bearer ${accessToken}`)
+  }
+
+  const res = await fetch(`${API_BASE}${path}`, {
+    ...init,
+    headers,
+    credentials: 'include',
+  })
+
+  const payload = await parseJsonSafe(res)
+  if (res.ok) {
+    return { ok: true, status: res.status, data: payload as T, error: null }
+  }
+
+  const message = (payload && (payload.message || payload.error)) || res.statusText || 'Request failed'
+  return {
+    ok: false,
+    status: res.status,
+    data: null,
+    error: { message: String(message), code: payload?.code },
+  }
 }
 
 export async function login(email: string, password: string): Promise<AuthResult> {
